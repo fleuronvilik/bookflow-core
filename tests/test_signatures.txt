@@ -1,0 +1,9 @@
+-- test_delivery_report.py
+def test_mark_delivered_allowed_only_from_approved(partner_actor, start_status):
+def test_mark_delivered_transitions_approved_to_delivered(partner_actor):
+def test_approve_allowed_only_from_submitted(partner_actor, start_status):
+def test_approve_transitions_submitted_to_approved(admin_actor):
+def test_submit_allowed_only_from_draft(partner_actor, start_status):
+def test_submit_draft_succeeds():
+def test_reopen_submitted_approved_delivered_fails(start_status):
+def test_reopen_from_draft_and_rejected_succeeds(start_status):
