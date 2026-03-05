@@ -22,7 +22,7 @@ from domain.delivery_request import (
     DeliveryRequest,
 )
 from policies.identity import Forbidden, Role, Actor
-from policies.validations import compute_partner_stock
+from policies.validations import InsufficientStock, compute_partner_stock
 from tests.helpers import given_dr, given_sr
 
 
@@ -69,7 +69,7 @@ def test_submit_sales_report_rejects_quantities_gt_stock(ctx, partner_actor):
     ctx.dr_repo.add(dr)
 
     # Ventes déclarées: 2 exemplaires => dépasse le stock entrant (1)
-    with pytest.raises(InvalidReport):
+    with pytest.raises(InsufficientStock):
         submit_sales_report(
             ctx=ctx,
             actor=partner_actor,

@@ -51,5 +51,8 @@ def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
     return dr_id
 
 
-def given_sr(ctx, partner_id: str, items=[ReportItem(book_id="b2", quantity=2)]) -> int:
-    return ctx.sr_repo.add(SalesReport(partner_id=partner_id, items=items))
+def given_sr(
+    ctx, partner_id: str, items=[ReportItem(book_id="b2", quantity=2)], voided=False
+) -> int:
+    sr = SalesReport(partner_id=partner_id, items=items, voided=voided)
+    return ctx.sr_repo.add(sr)
