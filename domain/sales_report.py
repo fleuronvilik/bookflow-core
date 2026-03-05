@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from typing import List
 from .errors import InvalidReport
 
-# class InvalidReport(Exception):
-#   pass
+
+class AlreadyVoided(Exception):
+    pass
 
 
 @dataclass
@@ -16,6 +17,7 @@ class ReportItem:
 class SalesReport:
     partner_id: str
     items: List[ReportItem]
+    voided: bool = False
 
     def __post_init__(self) -> None:
         if not self.partner_id:
@@ -44,3 +46,8 @@ class SalesReport:
             raise InvalidReport(
                 f"report minimum size is {min_size} (current size: {total_quantity})"
             )
+
+    def void(self):
+        if self.voided:
+            raise AlreadyVoided("report is already voided")
+        self.voided = True

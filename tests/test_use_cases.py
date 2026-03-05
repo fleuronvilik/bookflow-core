@@ -10,10 +10,11 @@ from app.use_cases import (
     reject_delivery_request,
     submit_delivery_request,
     submit_sales_report,
+    void_sales_report,
 )
 from domain.errors import InvalidReport
 from app.errors import NotFound, ValidationError
-from domain.sales_report import ReportItem, SalesReport
+from domain.sales_report import ReportItem, SalesReport, AlreadyVoided
 from domain.delivery_request import (
     InvalidDeliveryRequest,
     Status,
@@ -22,7 +23,7 @@ from domain.delivery_request import (
 )
 from policies.identity import Forbidden, Role, Actor
 from policies.validations import compute_partner_stock
-from tests.helpers import given_dr
+from tests.helpers import given_dr, given_sr
 
 
 def test_submit_sales_report_happy_path_persists(ctx, partner_actor):
@@ -260,6 +261,62 @@ def test_approve_delivery_request_not_found(ctx, admin_actor):
 def test_mark_delivered_dr_not_found(ctx, admin_actor):
     with pytest.raises(NotFound):
         mark_delivered(ctx, admin_actor, dr_id=999)
+
+
+def test_void_sales_report_requires_admin(ctx, partner_actor):
+    sr_id = given_sr(ctx, partner_actor.partner_id)
+    with pytest.raises(Forbidden):
+        void_sales_report(ctx, partner_actor, sr_id, "invalid report")
+
+    assert ctx.sr_repo.get(sr_id).voided is False
+    assert ctx.audit.events == []
+
+
+def test_void_sales_report_requires_reason(ctx, admin_actor):
+    sr_id = given_sr(ctx, "p1")
+    with pytest.raises(ValidationError):
+        void_sales_report(ctx, admin_actor, sr_id, "")
+
+    assert ctx.sr_repo.get(sr_id).voided is False
+    assert ctx.audit.events == []
+
+
+def test_void_sales_report_not_found(ctx, admin_actor):
+    with pytest.raises(NotFound):
+        void_sales_report(ctx, admin_actor, 999, "invalid report")
+
+
+def test_void_sales_report_happy_path(ctx, admin_actor):
+    """voids_report_and_records_audit"""
+    sr_id = given_sr(ctx, "p1")
+    _, report = void_sales_report(ctx, admin_actor, sr_id, "invalid report")
+
+    assert report.voided is True
+    assert len(ctx.audit.events) == 1
+    assert ctx.audit.events[0]["type"] == "SR_VOIDED"
+    assert ctx.audit.events[0]["sr_id"] == sr_id
+    assert ctx.audit.events[0]["reason"] == "invalid report"
+
+
+def test_void_sales_report_already_voided_raises(ctx, admin_actor):
+    sr_id = given_sr(ctx, "p1")
+    void_sales_report(ctx, admin_actor, sr_id, "invalid report")
+    with pytest.raises(AlreadyVoided):
+        void_sales_report(ctx, admin_actor, sr_id, "invalid report")
+
+
+def test_void_sales_report_fails_if_audit_unavailable_and_sr_unchanged(
+    ctx, admin_actor
+):
+    sr_id = given_sr(ctx, "p1")
+    ctx.audit.fail = True
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        void_sales_report(ctx, admin_actor, sr_id, "invalid report")
+
+    sr = ctx.sr_repo.get(sr_id)
+    assert sr.voided is False
+    assert ctx.audit.events == []
 
 
 def test_get_sales_report_not_found_raises_not_found(ctx, admin_actor):

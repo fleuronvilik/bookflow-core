@@ -134,6 +134,29 @@ def submit_sales_report(
     return sr_id, report
 
 
+def void_sales_report(
+    ctx: Context, actor: Actor, sr_id: int, reason: str
+) -> Tuple[int, SalesReport]:
+    if actor.role != Role.ADMIN:
+        raise Forbidden("only an ADMIN can void a sales report")
+
+    if reason is None or not str(reason).strip():
+        raise ValidationError("void reason is required")
+
+    sr = get_sr_or_raise(ctx, sr_id)
+
+    ctx.audit.record(
+        {
+            "type": "SR_VOIDED",
+            "sr_id": sr_id,
+            "reason": reason,
+        }
+    )
+
+    sr.void()
+    return sr_id, sr
+
+
 def list_reports_by_partner(
     *,
     actor: Actor,
