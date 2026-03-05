@@ -5,8 +5,7 @@ from app.support.event_order import EventOrder
 from app.repositories import InMemorySalesReportRepo, InMemoryDeliveryRequestRepo
 from app.context import Context
 from policies.identity import Actor, Role
-# from domain.delivery_request import RequestItem
-# from domain.sales_report import ReportItem
+from app.audit import InMemoryAudit
 
 
 @pytest.fixture
@@ -31,9 +30,11 @@ def sr_repo(order: EventOrder) -> InMemorySalesReportRepo:
     # IMPORTANT : partage le même order que dr_repo
     return InMemorySalesReportRepo(order=order)
 
+
 @pytest.fixture
 def ctx(catalog, dr_repo, sr_repo) -> Context:
-    return Context(catalog, dr_repo, sr_repo)
+    return Context(catalog, dr_repo, sr_repo, InMemoryAudit())
+
 
 @pytest.fixture
 def partner_actor() -> Actor:

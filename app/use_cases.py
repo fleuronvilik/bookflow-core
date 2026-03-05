@@ -12,10 +12,14 @@ from policies.validations import (
     validate_request_items_in_catalog,
     validate_sales_report_against_stock,
 )
+from policies.active_delivery_request import (
+    ensure_no_active_delivery_request_for_partner,
+)
 from .repositories import InMemorySalesReportRepo
 from .queries import reports_by_partner
 from .context import Context
 from .helpers import get_dr_or_raise, get_sr_or_raise
+from .errors import ValidationError
 
 
 def create_delivery_request(
@@ -33,7 +37,6 @@ def create_delivery_request(
     # DR validated against global catalog (policy)
     validate_request_items_in_catalog(dr.items, ctx.catalog)
 
-    # DR créée directement en SUBMITTED (DRAFT hors scope ici)
     dr_id = ctx.dr_repo.add(dr)
     return dr_id, dr
 
@@ -50,9 +53,13 @@ def submit_delivery_request(
     if dr.partner_id != actor.partner_id:
         raise Forbidden("partner cannot submit another partner delivery request")
 
+    ensure_no_active_delivery_request_for_partner(
+        partner_id=dr.partner_id, dr_repo=ctx.dr_repo
+    )
+
     # Policy ReportRequired (bloquée au submit)
     ensure_report_submitted_since_last_delivery(
-        partner_id=actor.partner_id,
+        partner_id=dr.partner_id,
         dr_entries=ctx.dr_repo.list_entries(),
         sr_entries=ctx.sr_repo.list_entries(),
     )
@@ -73,13 +80,40 @@ def approve_delivery_request(
     return dr_id, dr
 
 
-def mark_delivered_delivery_request(
+def reject_delivery_request(
+    ctx: Context, actor: Actor, dr_id: int, reason: str
+) -> Tuple[int, DeliveryRequest]:
+    if actor.role != Role.ADMIN:
+        raise Forbidden("only an ADMIN can reject a deliery request")
+
+    # reason obligatoire
+    if reason is None or not str(reason).strip():
+        raise ValidationError("reject reason is required")
+
+    dr = get_dr_or_raise(ctx, dr_id)
+
+    # Audit requis (si audit absent/KO -> on échoue)
+    ctx.audit.record(
+        {
+            "type": "DR_REJECTED",
+            "dr_id": dr_id,
+            "reason": reason,
+        }
+    )
+
+    # Transition métier (idéalement: l'entité refuse si state != SUBMITTED)
+    dr.reject()
+
+    return dr_id, dr
+
+
+def mark_delivered(
     ctx: Context, actor: Actor, dr_id: int
 ) -> Tuple[int, DeliveryRequest]:
     if actor.role is not Role.ADMIN:
         raise Forbidden("only ADMIN can mark a delivery request delivered")
 
-    dr = get_dr_or_raise(ctx.dr_repo, dr_id)
+    dr = get_dr_or_raise(ctx, dr_id)
     dr.mark_delivered()
     return dr_id, dr
 

@@ -1,7 +1,18 @@
 import pytest
 
+from app.use_cases import (
+    approve_delivery_request,
+    create_delivery_request,
+    get_sales_report,
+    list_my_reports,
+    list_reports_by_partner,
+    mark_delivered,
+    reject_delivery_request,
+    submit_delivery_request,
+    submit_sales_report,
+)
 from domain.errors import InvalidReport
-from app.errors import NotFound
+from app.errors import NotFound, ValidationError
 from domain.sales_report import ReportItem, SalesReport
 from domain.delivery_request import (
     InvalidDeliveryRequest,
@@ -11,20 +22,20 @@ from domain.delivery_request import (
 )
 from policies.identity import Forbidden, Role, Actor
 from policies.validations import compute_partner_stock
-from app import use_cases as uc
+from tests.helpers import given_dr
 
 
 def test_submit_sales_report_happy_path_persists(ctx, partner_actor):
-    dr_id, dr = uc.create_delivery_request(
+    dr_id, dr = create_delivery_request(
         ctx, partner_actor, payload=[RequestItem(book_id="b1", quantity=3)]
     )
-    dr_id, dr = uc.submit_delivery_request(ctx, partner_actor, dr_id)
-    _, dr = uc.approve_delivery_request(ctx, Actor(role=Role.ADMIN), dr_id)
+    dr_id, dr = submit_delivery_request(ctx, partner_actor, dr_id)
+    _, dr = approve_delivery_request(ctx, Actor(role=Role.ADMIN), dr_id)
     dr.mark_delivered()
 
     assert ctx.dr_repo.list_all() == [dr]
 
-    _, report = uc.submit_sales_report(
+    _, report = submit_sales_report(
         ctx=ctx,
         actor=partner_actor,
         payload=[ReportItem(book_id="b1", quantity=2)],
@@ -38,7 +49,7 @@ def test_submit_sales_report_happy_path_persists(ctx, partner_actor):
 
 def test_submit_sales_report_requires_known_book_ids(ctx, partner_actor):
     with pytest.raises(InvalidReport):
-        uc.submit_sales_report(
+        submit_sales_report(
             ctx=ctx,
             actor=partner_actor,
             payload=[ReportItem(book_id="b5", quantity=2)],
@@ -58,7 +69,7 @@ def test_submit_sales_report_rejects_quantities_gt_stock(ctx, partner_actor):
 
     # Ventes déclarées: 2 exemplaires => dépasse le stock entrant (1)
     with pytest.raises(InvalidReport):
-        uc.submit_sales_report(
+        submit_sales_report(
             ctx=ctx,
             actor=partner_actor,
             payload=[ReportItem(book_id="b1", quantity=3)],
@@ -71,7 +82,7 @@ def test_submit_sales_report_rejects_invalid_sr_before_catalog_policy(
     ctx, partner_actor
 ):
     with pytest.raises(InvalidReport):
-        uc.submit_sales_report(
+        submit_sales_report(
             ctx=ctx,
             actor=partner_actor,
             payload=[ReportItem(book_id="b1", quantity=1)],  # total_quantity=1 < 2
@@ -82,7 +93,7 @@ def test_submit_sales_report_rejects_invalid_sr_before_catalog_policy(
 
 def test_admin_cannot_submit_sales_report(ctx, admin_actor):
     with pytest.raises(Forbidden):
-        uc.submit_sales_report(
+        submit_sales_report(
             ctx=ctx,
             actor=admin_actor,
             payload=[ReportItem(book_id="b1", quantity=2)],
@@ -95,14 +106,14 @@ def test_partner_cannot_submit_another_partner_delivery_request(ctx):
     p1 = Actor(role=Role.PARTNER, partner_id="p1")
     p2 = Actor(role=Role.PARTNER, partner_id="p2")
 
-    dr_id, _ = uc.create_delivery_request(
+    dr_id, _ = create_delivery_request(
         ctx,
         p1,
         payload=[RequestItem(book_id="b1", quantity=2)],
     )
 
     with pytest.raises(Forbidden):
-        uc.submit_delivery_request(ctx, p2, dr_id)
+        submit_delivery_request(ctx, p2, dr_id)
 
 
 def test_list_reports_by_partner_filters_for_admin(admin_actor, sr_repo):
@@ -114,7 +125,7 @@ def test_list_reports_by_partner_filters_for_admin(admin_actor, sr_repo):
     sr_repo.add(r2)
     sr_repo.add(r3)
 
-    result = uc.list_reports_by_partner(
+    result = list_reports_by_partner(
         actor=admin_actor, partner_id="p1", sr_repo=sr_repo
     )
 
@@ -122,7 +133,7 @@ def test_list_reports_by_partner_filters_for_admin(admin_actor, sr_repo):
 
 
 def test_list_reports_by_partner_returns_empty_list_if_none(admin_actor, sr_repo):
-    result = uc.list_reports_by_partner(
+    result = list_reports_by_partner(
         actor=admin_actor, partner_id="p1", sr_repo=sr_repo
     )
     assert result == []
@@ -130,14 +141,14 @@ def test_list_reports_by_partner_returns_empty_list_if_none(admin_actor, sr_repo
 
 def test_list_reports_by_partner_rejects_partner(partner_actor, sr_repo):
     with pytest.raises(Forbidden):
-        uc.list_reports_by_partner(
+        list_reports_by_partner(
             actor=partner_actor, partner_id=partner_actor.partner_id, sr_repo=sr_repo
         )
 
 
 def test_list_my_reports_rejects_admin(admin_actor, sr_repo):
     with pytest.raises(Forbidden):
-        uc.list_my_reports(actor=admin_actor, sr_repo=sr_repo)
+        list_my_reports(actor=admin_actor, sr_repo=sr_repo)
 
 
 def test_list_my_reports_happy_path(partner_actor, sr_repo):
@@ -157,15 +168,15 @@ def test_list_my_reports_happy_path(partner_actor, sr_repo):
 
     a3 = Actor(role=Role.PARTNER, partner_id="p3")
 
-    result = uc.list_my_reports(actor=partner_actor, sr_repo=sr_repo)
+    result = list_my_reports(actor=partner_actor, sr_repo=sr_repo)
     assert result == [r1, r2]
-    result = uc.list_my_reports(actor=a3, sr_repo=sr_repo)
+    result = list_my_reports(actor=a3, sr_repo=sr_repo)
     assert result == []
 
 
 def test_create_delivery_request_requires_known_book_ids(ctx, partner_actor):
     with pytest.raises(InvalidDeliveryRequest):
-        uc.create_delivery_request(
+        create_delivery_request(
             ctx=ctx,
             actor=partner_actor,
             payload=[RequestItem(book_id="b5", quantity=2)],
@@ -173,12 +184,12 @@ def test_create_delivery_request_requires_known_book_ids(ctx, partner_actor):
 
 
 def test_submit_allowed_when_no_previous_delivery_exists(ctx, partner_actor):
-    dr_id, dr = uc.create_delivery_request(
+    dr_id, dr = create_delivery_request(
         ctx=ctx,
         actor=partner_actor,
         payload=[RequestItem(book_id="b1", quantity=2)],
     )
-    _, submitted = uc.submit_delivery_request(ctx=ctx, actor=partner_actor, dr_id=dr_id)
+    _, submitted = submit_delivery_request(ctx=ctx, actor=partner_actor, dr_id=dr_id)
 
     assert submitted.status is Status.SUBMITTED
     assert submitted.partner_id == partner_actor.partner_id
@@ -188,7 +199,7 @@ def test_submit_allowed_when_no_previous_delivery_exists(ctx, partner_actor):
 
 def test_admin_cannot_submit_delivery_request(ctx, admin_actor):
     with pytest.raises(Forbidden):
-        uc.submit_delivery_request(
+        submit_delivery_request(
             ctx=ctx,
             actor=admin_actor,
             dr_id=1,
@@ -196,21 +207,61 @@ def test_admin_cannot_submit_delivery_request(ctx, admin_actor):
     assert ctx.dr_repo.list_entries() == []
 
 
+def test_reject_delivery_request_requires_admin(ctx, partner_actor):
+    dr1 = given_dr(ctx, partner_actor.partner_id, Status.SUBMITTED)
+    with pytest.raises(Forbidden):
+        reject_delivery_request(ctx, partner_actor, dr1, "test")
+
+
+def test_reject_delivery_request_requires_reason(ctx, admin_actor):
+    dr1 = given_dr(ctx, "p1", Status.SUBMITTED)
+    with pytest.raises(ValidationError):
+        reject_delivery_request(ctx, admin_actor, dr1, "")
+
+
+def test_reject_delivery_request_not_found(ctx, admin_actor):
+    with pytest.raises(NotFound):
+        reject_delivery_request(ctx, admin_actor, 999, "test")
+
+
+def test_reject_delivery_request_happy_path(ctx, admin_actor):
+    """sets_state_and_records_audit"""
+    dr1 = given_dr(ctx, "p1", Status.SUBMITTED)
+    _, dr = reject_delivery_request(ctx, admin_actor, dr1, "test")
+    assert dr.status == Status.REJECTED
+    assert len(ctx.audit.events) == 1
+    assert ctx.audit.events[0]["type"] == "DR_REJECTED"
+    assert ctx.audit.events[0]["dr_id"] == dr1
+    assert ctx.audit.events[0]["reason"] == "test"
+
+
+def test_reject_delivery_request_fails_if_audit_unavailable(ctx, admin_actor):
+    dr1 = given_dr(ctx, "p1", Status.SUBMITTED)
+    ctx.audit.fail = True
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        reject_delivery_request(ctx, admin_actor, dr1, "test")
+
+    dr = ctx.dr_repo.get(dr1)
+    assert dr.status == Status.SUBMITTED
+    assert ctx.audit.events == []
+
+
 def test_submit_delivery_request_not_found(ctx, partner_actor):
     with pytest.raises(NotFound):
-        uc.submit_delivery_request(ctx, partner_actor, dr_id=999)
+        submit_delivery_request(ctx, partner_actor, dr_id=999)
 
 
 def test_approve_delivery_request_not_found(ctx, admin_actor):
     with pytest.raises(NotFound):
-        uc.approve_delivery_request(ctx, admin_actor, dr_id=999)
+        approve_delivery_request(ctx, admin_actor, dr_id=999)
 
 
-def test_mark_delivered_dr_request_not_found(ctx, admin_actor):
+def test_mark_delivered_dr_not_found(ctx, admin_actor):
     with pytest.raises(NotFound):
-        uc.mark_delivered_delivery_request(ctx, admin_actor, dr_id=999)
+        mark_delivered(ctx, admin_actor, dr_id=999)
 
 
 def test_get_sales_report_not_found_raises_not_found(ctx, admin_actor):
     with pytest.raises(NotFound):
-        uc.get_sales_report(ctx, admin_actor, 999)
+        get_sales_report(ctx, admin_actor, 999)

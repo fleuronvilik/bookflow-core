@@ -84,10 +84,10 @@ class DeliveryRequest:
             raise InvalidTransition("SUBMITTED only if DRAFT")
         self.status = Status.SUBMITTED
 
-    def reopen(self) -> None:
-        if self.status not in [Status.REJECTED, Status.DRAFT]:
-            raise InvalidTransition("Return to DRAFT applies only to REJECTED")
-        self.status = Status.DRAFT
+    def reject(self) -> None:
+        if self.status != Status.SUBMITTED:
+            raise InvalidTransition("REJECTED only if SUBMITTED")
+        self.status = Status.REJECTED
 
     def __str__(self):
         return self.status
