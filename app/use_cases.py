@@ -190,3 +190,9 @@ def get_sales_report(ctx: Context, actor: Actor, sr_id: int) -> SalesReport:
     if actor.role != Role.ADMIN:
         raise Forbidden("only ADMIN can access a sale report")
     return get_sr_or_raise(ctx=ctx, sr_id=sr_id)
+
+
+def get_delivery_request(ctx: Context, actor: Actor, dr_id: int) -> DeliveryRequest:
+    if actor.role != Role.ADMIN:
+        raise Forbidden("only ADMIN can access a delivery request")
+    return get_dr_or_raise(ctx=ctx, dr_id=dr_id)
