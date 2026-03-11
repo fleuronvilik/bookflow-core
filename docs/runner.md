@@ -53,3 +53,9 @@ Il orchestre seulement :
 - [runner/dispatch.py](../runner/dispatch.py)
 - [runner/engine.py](../runner/engine.py)
 - [run_scenario.py](../run_scenario.py)
+
+## CLI
+
+```bash
+python run_scenario.py <partner-id> <scenario-path-or-name>
+```

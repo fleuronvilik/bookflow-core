@@ -20,7 +20,7 @@ Modélisation d'un système de dépôt-vente pour la distribution de livres.
 ## Lancer un scénario
 
 ```bash
-python run_scenario.py <scenario-path-or-name>
+python run_scenario.py <partner-id> <scenario-path-or-name>
 ```
 
 Les scénarios sont dans le dossier `scenarios/`.
