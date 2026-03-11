@@ -1,35 +1,43 @@
 from typing import Dict
-from domain.delivery_request import (
-    Status as DRStatus,
-)
-from app.repositories import InMemoryDeliveryRequestRepo, InMemorySalesReportRepo
+
+from infra.sql.sql_delivery_request_repo import SqlDeliveryRequestRepo
+from infra.sql.sql_sales_report_repo import SqlSalesReportRepo
 
 
 def compute_partner_stock(
     partner_id: str,
-    dr_repo: InMemoryDeliveryRequestRepo,
-    sr_repo: InMemorySalesReportRepo,
+    dr_repo: SqlDeliveryRequestRepo,
+    sr_repo: SqlSalesReportRepo,
 ) -> Dict[str, int]:
-    inbound: Dict[str, int] = {}
-    for dr in dr_repo.list_all():
-        if dr.partner_id != partner_id:
-            continue
-        if dr.status is not DRStatus.DELIVERED:
-            continue
-        for it in dr.items:
-            inbound[it.book_id] = inbound.get(it.book_id, 0) + it.quantity
+    cur = dr_repo.conn.cursor()
 
-    outbound_existing: Dict[str, int] = {}
-    for sr in sr_repo.list_all():
-        if sr.partner_id != partner_id or sr.voided:
-            continue
-        for it in sr.items:
-            outbound_existing[it.book_id] = (
-                outbound_existing.get(it.book_id, 0) + it.quantity
-            )
+    delivered_rows = cur.execute(
+        """
+        SELECT it.book_sku, SUM(it.qty)
+        FROM delivery_requests AS dr
+        JOIN delivery_request_items AS it ON dr.id = it.dr_id
+        WHERE dr.partner_id = ?
+          AND dr.status = 'DELIVERED'
+        GROUP BY it.book_sku
+        """,
+        (partner_id,),
+    ).fetchall()
 
-    stock: Dict[str, int] = {}
-    for book_id in inbound:
-        print(book_id)
-        stock[book_id] = inbound.get(book_id, 0) - outbound_existing.get(book_id, 0)
-    return stock
+    sold_rows = cur.execute(
+        """
+        SELECT it.book_sku, SUM(it.qty)
+        FROM sales_reports AS sr
+        JOIN sales_report_items AS it ON sr.id = it.sr_id
+        WHERE sr.partner_id = ?
+        AND sr.is_voided = 0
+        GROUP BY it.book_sku
+        """,
+        (partner_id,),
+    ).fetchall()
+
+    delivered = {sku: qty for sku, qty in delivered_rows}
+    sold = {sku: qty for sku, qty in sold_rows}
+
+    all_books = set(delivered) | set(sold)
+
+    return {sku: delivered.get(sku, 0) - sold.get(sku, 0) for sku in all_books}

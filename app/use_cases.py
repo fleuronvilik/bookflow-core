@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 from domain.delivery_request import RequestItem, DeliveryRequest
-from domain.sales_report import SalesReport, ReportItem
+from domain.sales_report import AlreadyVoided, SalesReport, ReportItem
 from policies.identity import Forbidden, Role, Actor
 from policies.report_required import ensure_report_submitted_since_last_delivery
 from policies.active_delivery_request import (
@@ -12,11 +12,6 @@ from policies.validations import (
     validate_request_items_in_catalog,
     validate_sales_report_against_stock,
 )
-from policies.active_delivery_request import (
-    ensure_no_active_delivery_request_for_partner,
-)
-from .repositories import InMemorySalesReportRepo
-from .queries import reports_by_partner
 from .context import Context
 from .helpers import get_dr_or_raise, get_sr_or_raise
 from .errors import ValidationError
@@ -37,7 +32,7 @@ def create_delivery_request(
     # DR validated against global catalog (policy)
     validate_request_items_in_catalog(dr.items, ctx.catalog)
 
-    dr_id = ctx.dr_repo.add(dr)
+    dr_id = ctx.dr_repo.create(dr)
     return dr_id, dr
 
 
@@ -59,12 +54,11 @@ def submit_delivery_request(
 
     # Policy ReportRequired (bloquée au submit)
     ensure_report_submitted_since_last_delivery(
-        partner_id=dr.partner_id,
-        dr_entries=ctx.dr_repo.list_entries(),
-        sr_entries=ctx.sr_repo.list_entries(),
+        partner_id=dr.partner_id, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
     )
 
     dr.submit()
+    ctx.dr_repo.save_status(dr_id, dr.status)
     return dr_id, dr
 
 
@@ -77,6 +71,7 @@ def approve_delivery_request(
 
     dr = get_dr_or_raise(ctx, dr_id)
     dr.approve()
+    ctx.dr_repo.save_status(dr_id, dr.status)
     return dr_id, dr
 
 
@@ -96,7 +91,8 @@ def reject_delivery_request(
     ctx.audit.record(
         {
             "type": "DR_REJECTED",
-            "dr_id": dr_id,
+            "target_type": "delivery_request",
+            "target_id": dr_id,
             "reason": reason,
         }
     )
@@ -115,6 +111,7 @@ def mark_delivered(
 
     dr = get_dr_or_raise(ctx, dr_id)
     dr.mark_delivered()
+    ctx.dr_repo.save_status(dr_id, dr.status)
     return dr_id, dr
 
 
@@ -130,7 +127,7 @@ def submit_sales_report(
     validate_sales_report_against_stock(
         report=report, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
     )
-    sr_id = ctx.sr_repo.add(report)  # persistance mémoire
+    sr_id = ctx.sr_repo.create(report)  # persistance mémoire
     return sr_id, report
 
 
@@ -144,55 +141,61 @@ def void_sales_report(
         raise ValidationError("void reason is required")
 
     sr = get_sr_or_raise(ctx, sr_id)
+    if sr.voided:
+        raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
+    ctx.sr_repo.mark_void(sr_id)
 
     ctx.audit.record(
         {
             "type": "SR_VOIDED",
-            "sr_id": sr_id,
+            "target_type": "sales_report",
+            "target_id": sr_id,
             "reason": reason,
         }
     )
 
-    sr.void()
-    return sr_id, sr
+    # ctx.sr_repo.mark_void(sr_id)
+    return sr_id, get_sr_or_raise(ctx, sr_id)
 
 
-def list_reports_by_partner(
-    *,
-    actor: Actor,
-    partner_id: str,
-    sr_repo: InMemorySalesReportRepo,
-) -> List[SalesReport]:
-    # Rule: ADMIN must provide a partner_id (no "list all" shortcut in this use-case).
-    if actor.role is not Role.ADMIN:
-        raise Forbidden("only ADMIN can list reports for an arbitrary partner")
+# def list_reports_by_partner(
+#     *,
+#     actor: Actor,
+#     partner_id: str,
+#     sr_repo: InMemorySalesReportRepo,
+# ) -> List[SalesReport]:
+#     # Rule: ADMIN must provide a partner_id (no "list all" shortcut in this use-case).
+#     if actor.role is not Role.ADMIN:
+#         raise Forbidden("only ADMIN can list reports for an arbitrary partner")
 
-    if not partner_id:
-        raise ValueError("partner_id is required")
+#     if not partner_id:
+#         raise ValueError("partner_id is required")
 
-    return reports_by_partner(sr_repo.list_all(), partner_id)
-
-
-def list_my_reports(
-    *,
-    actor: Actor,
-    sr_repo: InMemorySalesReportRepo,
-) -> List[SalesReport]:
-    # Rule: "my reports" is a PARTNER-only intention.
-    if actor.role is not Role.PARTNER:
-        raise Forbidden("only PARTNER can list their own reports")
-
-    # Actor invariant guarantees partner_id is present for PARTNER.
-    return reports_by_partner(sr_repo.list_all(), actor.partner_id)
+#     return reports_by_partner(sr_repo.list_all(), partner_id)
 
 
-def get_sales_report(ctx: Context, actor: Actor, sr_id: int) -> SalesReport:
+# def list_my_reports(
+#     *,
+#     actor: Actor,
+#     sr_repo: InMemorySalesReportRepo,
+# ) -> List[SalesReport]:
+#     # Rule: "my reports" is a PARTNER-only intention.
+#     if actor.role is not Role.PARTNER:
+#         raise Forbidden("only PARTNER can list their own reports")
+
+#     # Actor invariant guarantees partner_id is present for PARTNER.
+#     return reports_by_partner(sr_repo.list_all(), actor.partner_id)
+
+
+def get_sales_report(ctx: Context, actor: Actor, sr_id: int) -> SalesReport | None:
     if actor.role != Role.ADMIN:
         raise Forbidden("only ADMIN can access a sale report")
-    return get_sr_or_raise(ctx=ctx, sr_id=sr_id)
+    return get_sr_or_raise(ctx, sr_id)
 
 
-def get_delivery_request(ctx: Context, actor: Actor, dr_id: int) -> DeliveryRequest:
+def get_delivery_request(
+    ctx: Context, actor: Actor, dr_id: int
+) -> DeliveryRequest | None:
     if actor.role != Role.ADMIN:
         raise Forbidden("only ADMIN can access a delivery request")
-    return get_dr_or_raise(ctx=ctx, dr_id=dr_id)
+    return get_dr_or_raise(ctx, dr_id)
