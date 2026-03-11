@@ -1,13 +1,12 @@
 from domain.delivery_request import Status
+from app.bootstrap import admin, make_ctx, partner
 from runner.dispatch import COMMANDS, QUERIES, RunnerRuntime, dispatch_parsed
 from runner.parser import ParsedLine
-from scripts.common import admin, make_ctx, partner
-from app.support.event_order import EventOrder
 
 
 def make_runtime() -> RunnerRuntime:
     return RunnerRuntime(
-        ctx=make_ctx(EventOrder()),
+        ctx=make_ctx(testing=True),
         partner_id="p1",
         partner_actor=partner("p1"),
         admin_actor=admin(),
@@ -50,7 +49,9 @@ def test_dispatch_submit():
     runtime = make_runtime()
     dispatch_parsed(
         runtime,
-        ParsedLine(actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"),
+        ParsedLine(
+            actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"
+        ),
     )
 
     result = dispatch_parsed(
@@ -66,7 +67,9 @@ def test_dispatch_approve():
     runtime = make_runtime()
     dispatch_parsed(
         runtime,
-        ParsedLine(actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"),
+        ParsedLine(
+            actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"
+        ),
     )
     dispatch_parsed(
         runtime,
@@ -86,7 +89,9 @@ def test_dispatch_deliver():
     runtime = make_runtime()
     dispatch_parsed(
         runtime,
-        ParsedLine(actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"),
+        ParsedLine(
+            actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"
+        ),
     )
     dispatch_parsed(
         runtime,
@@ -130,8 +135,8 @@ def test_dispatch_report():
         ParsedLine(actor="P", command="report", args={"items": "b1*2"}, assign="sr1"),
     )
 
-    assert result == {"ok": True, "id": 2, "msg": "reported sr 2"}
-    sr = runtime.ctx.sr_repo.get(2)
+    assert result == {"ok": True, "id": 1, "msg": "reported sr 1"}
+    sr = runtime.ctx.sr_repo.get(1)
     assert sr.partner_id == "p1"
     assert sr.voided is False
     assert [(it.book_id, it.quantity) for it in sr.items] == [("b1", 2)]
@@ -162,18 +167,25 @@ def test_dispatch_void():
 
     result = dispatch_parsed(
         runtime,
-        ParsedLine(actor="A", command="void", args={"sr": "2", "reason": "mistake"}, assign=None),
+        ParsedLine(
+            actor="A",
+            command="void",
+            args={"sr": "1", "reason": "mistake"},
+            assign=None,
+        ),
     )
 
-    assert result == {"ok": True, "id": 2, "msg": "voided sr 2"}
-    assert runtime.ctx.sr_repo.get(2).voided is True
+    assert result == {"ok": True, "id": 1, "msg": "voided sr 1"}
+    assert runtime.ctx.sr_repo.get(1).voided is True
 
 
 def test_dispatch_show_dr():
     runtime = make_runtime()
     dispatch_parsed(
         runtime,
-        ParsedLine(actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"),
+        ParsedLine(
+            actor="P", command="create", args={"items": "b1*1;b2*1"}, assign="dr1"
+        ),
     )
 
     result = dispatch_parsed(
@@ -209,17 +221,19 @@ def test_dispatch_show_sr():
 
     result = dispatch_parsed(
         runtime,
-        ParsedLine(actor=None, command="show", args={"sr": "2"}, assign=None),
+        ParsedLine(actor=None, command="show", args={"sr": "1"}, assign=None),
     )
 
-    assert result == {"ok": True, "id": 2, "msg": "SR#2 voided=False"}
+    assert result == {"ok": True, "id": 1, "msg": "SR#1 voided=False"}
 
 
 def test_dispatch_stock_uses_runner_partner():
     runtime = make_runtime()
     dispatch_parsed(
         runtime,
-        ParsedLine(actor="P", command="create", args={"items": "b1*2;b2*1"}, assign="dr1"),
+        ParsedLine(
+            actor="P", command="create", args={"items": "b1*2;b2*1"}, assign="dr1"
+        ),
     )
     dispatch_parsed(
         runtime,

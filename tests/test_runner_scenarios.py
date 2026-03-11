@@ -1,9 +1,8 @@
 from pathlib import Path
 
-from app.support.event_order import EventOrder
+from app.bootstrap import admin, make_ctx, partner
 from runner.dispatch import RunnerRuntime
 from runner.engine import run_lines
-from scripts.common import admin, make_ctx, partner
 
 
 SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "scenarios"
@@ -11,7 +10,7 @@ SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "scenarios"
 
 def make_runtime() -> RunnerRuntime:
     return RunnerRuntime(
-        ctx=make_ctx(EventOrder()),
+        ctx=make_ctx(testing=True),
         partner_id="p1",
         partner_actor=partner("p1"),
         admin_actor=admin(),
@@ -65,7 +64,7 @@ def test_active_dr_scenario_stops_on_policy_violation():
         {
             "ok": False,
             "id": None,
-            "msg": "line 9: active delivery request already exists for partner p1",
+            "msg": "line 9: ActiveDeliveryRequestExists",
         },
     ]
     assert runtime.vars == {"dr1": "1", "dr2": "2", "active1": "1"}
@@ -107,11 +106,11 @@ def test_transversal_scenario_runs_without_error():
         {"ok": True, "id": 1, "msg": "submitted dr 1"},
         {"ok": True, "id": 1, "msg": "approved dr 1"},
         {"ok": True, "id": 1, "msg": "delivered dr 1"},
-        {"ok": True, "id": 2, "msg": "reported sr 2"},
-        {"ok": True, "id": 2, "msg": "SR#2 voided=False"},
+        {"ok": True, "id": 1, "msg": "reported sr 1"},
+        {"ok": True, "id": 1, "msg": "SR#1 voided=False"},
         {"ok": True, "id": None, "msg": "stock p1: b1=0"},
-        {"ok": True, "id": 2, "msg": "voided sr 2"},
-        {"ok": True, "id": 2, "msg": "SR#2 voided=True"},
+        {"ok": True, "id": 1, "msg": "voided sr 1"},
+        {"ok": True, "id": 1, "msg": "SR#1 voided=True"},
         {"ok": True, "id": None, "msg": "stock p1: b1=2"},
     ]
     assert runtime.vars == {
@@ -119,6 +118,6 @@ def test_transversal_scenario_runs_without_error():
         "submitted1": "1",
         "approved1": "1",
         "delivered1": "1",
-        "sr1": "2",
-        "sr1_voided": "2",
+        "sr1": "1",
+        "sr1_voided": "1",
     }

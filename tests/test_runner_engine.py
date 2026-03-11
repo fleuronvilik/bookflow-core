@@ -1,12 +1,11 @@
-from app.support.event_order import EventOrder
 from runner.dispatch import RunnerRuntime
 from runner.engine import run_file, run_lines
-from scripts.common import admin, make_ctx, partner
+from app.bootstrap import admin, make_ctx, partner
 
 
 def make_runtime() -> RunnerRuntime:
     return RunnerRuntime(
-        ctx=make_ctx(EventOrder()),
+        ctx=make_ctx(testing=True),
         partner_id="p1",
         partner_actor=partner("p1"),
         admin_actor=admin(),
