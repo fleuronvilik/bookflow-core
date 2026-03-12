@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.bootstrap import admin, make_ctx, partner
+from app.queries import PartnerCurrentState, get_partner_current_state
 from runner import RunnerRuntime, run_lines
 
 
@@ -60,6 +61,7 @@ def render_page(
     selected_scenario: str = "",
     script: str = "",
     results: Iterable[dict[str, bool | int | None | str]] | None = None,
+    current_state: PartnerCurrentState | None = None,
 ) -> str:
     partner_options = "\n".join(
         f"<option value=\"{escape(partner_id)}\""
@@ -91,6 +93,51 @@ def render_page(
             for result in results
         )
         results_html = f"<h2>Results</h2><pre>{lines or 'No output'}</pre>"
+
+    if current_state is None:
+        current_state = {
+            "delivery_requests": [],
+            "sales_reports": [],
+            "stock": [],
+        }
+
+    dr_rows = "\n".join(
+        (
+            "<tr>"
+            f"<td>{entry['id']}</td>"
+            f"<td>{escape(entry['status'])}</td>"
+            f"<td><code>{escape(entry['items'])}</code></td>"
+            "</tr>"
+        )
+        for entry in current_state["delivery_requests"]
+    )
+    if not dr_rows:
+        dr_rows = '<tr><td colspan="3" class="empty-state">No delivery requests</td></tr>'
+
+    sr_rows = "\n".join(
+        (
+            "<tr>"
+            f"<td>{entry['id']}</td>"
+            f"<td>{'yes' if entry['voided'] else 'no'}</td>"
+            f"<td><code>{escape(entry['items'])}</code></td>"
+            "</tr>"
+        )
+        for entry in current_state["sales_reports"]
+    )
+    if not sr_rows:
+        sr_rows = '<tr><td colspan="3" class="empty-state">No sales reports</td></tr>'
+
+    stock_rows = "\n".join(
+        (
+            "<tr>"
+            f"<td><code>{escape(entry['book_id'])}</code></td>"
+            f"<td>{entry['quantity']}</td>"
+            "</tr>"
+        )
+        for entry in current_state["stock"]
+    )
+    if not stock_rows:
+        stock_rows = '<tr><td colspan="2" class="empty-state">No stock</td></tr>'
 
     return f"""<!doctype html>
 <html lang="en">
@@ -190,6 +237,31 @@ def render_page(
         overflow-x: auto;
         white-space: pre-wrap;
       }}
+      table {{
+        width: 100%;
+        border-collapse: collapse;
+      }}
+      th,
+      td {{
+        border-top: 1px solid #e3e3e3;
+        padding: 0.65rem 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }}
+      th {{
+        border-top: 0;
+      }}
+      .state-grid {{
+        display: grid;
+        gap: 1rem;
+      }}
+      .state-section h2 {{
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+      }}
+      .empty-state {{
+        color: #666;
+      }}
       @media (max-width: 800px) {{
         .main-grid {{
           grid-template-columns: 1fr;
@@ -236,8 +308,54 @@ def render_page(
       </div>
     </form>
     {results_html}
-    <section class="panel placeholder">
-      <strong>Current State (coming soon)</strong>
+    <section class="panel state-section">
+      <strong>Current State</strong>
+      <div class="state-grid">
+        <section>
+          <h2>Delivery Requests</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dr_rows}
+            </tbody>
+          </table>
+        </section>
+        <section>
+          <h2>Sales Reports</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Voided</th>
+                <th>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sr_rows}
+            </tbody>
+          </table>
+        </section>
+        <section>
+          <h2>Stock</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stock_rows}
+            </tbody>
+          </table>
+        </section>
+      </div>
     </section>
     <script id="catalog-data" type="application/json">{escape(json.dumps(catalog_entries()))}</script>
     <script>
@@ -268,7 +386,12 @@ def render_page(
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    return HTMLResponse(render_page())
+    ctx = make_ctx(False, CATALOG)
+    return HTMLResponse(
+        render_page(
+            current_state=get_partner_current_state(ctx, PARTNERS[0]),
+        )
+    )
 
 
 @app.get("/catalog", response_class=JSONResponse)
@@ -283,6 +406,7 @@ async def run_script(request: Request) -> HTMLResponse:
     selected_scenario = payload.get("scenario", [""])[0]
     script = payload.get("script", [""])[0]
     action = payload.get("action", ["run"])[0]
+    ctx = make_ctx(False, CATALOG)
 
     if action == "load":
         return HTMLResponse(
@@ -290,10 +414,16 @@ async def run_script(request: Request) -> HTMLResponse:
                 selected_partner=selected_partner,
                 selected_scenario=selected_scenario,
                 script=load_scenario(selected_scenario),
+                current_state=get_partner_current_state(ctx, selected_partner),
             )
         )
 
-    runtime = make_runtime(selected_partner)
+    runtime = RunnerRuntime(
+        ctx=ctx,
+        partner_id=selected_partner,
+        partner_actor=partner(selected_partner),
+        admin_actor=admin(),
+    )
     results = run_lines(runtime, script.splitlines())
 
     return HTMLResponse(
@@ -302,5 +432,6 @@ async def run_script(request: Request) -> HTMLResponse:
             selected_scenario=selected_scenario,
             script=script,
             results=results,
+            current_state=get_partner_current_state(ctx, selected_partner),
         )
     )
