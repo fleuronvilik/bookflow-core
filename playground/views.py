@@ -141,9 +141,10 @@ def render_page(
             "catalog_html": catalog_html,
             "script": escape(script),
             "results_html": results_html,
+            "catalog_data_json": escape(json.dumps(catalog_entries())),
+            "current_state_json": escape(json.dumps(current_state)),
             "dr_rows": dr_rows,
             "sr_rows": sr_rows,
             "stock_rows": stock_rows,
-            "catalog_data_json": escape(json.dumps(catalog_entries())),
         },
     )

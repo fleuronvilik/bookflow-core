@@ -112,6 +112,16 @@
         display: grid;
         gap: 1rem;
       }
+      .state-drawer {
+        margin-top: 1.5rem;
+      }
+      .state-drawer summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .state-drawer[open] summary {
+        margin-bottom: 1rem;
+      }
       .state-section h2 {
         margin: 0 0 0.75rem;
         font-size: 1rem;
@@ -132,7 +142,7 @@
       <div class="toolbar">
         <label>
           Partner
-          <select name="partner">
+          <select id="partner" name="partner">
             {{partner_options}}
           </select>
         </label>
@@ -165,8 +175,8 @@
       </div>
     </form>
     {{results_html}}
-    <section class="panel state-section">
-      <strong>Current State</strong>
+    <details class="panel state-section state-drawer" open>
+      <summary>Current State</summary>
       <div class="state-grid">
         <section>
           <h2>Delivery Requests</h2>
@@ -178,7 +188,7 @@
                 <th>Items</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="delivery-requests-body">
               {{dr_rows}}
             </tbody>
           </table>
@@ -193,7 +203,7 @@
                 <th>Items</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="sales-reports-body">
               {{sr_rows}}
             </tbody>
           </table>
@@ -207,18 +217,83 @@
                 <th>Quantity</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="stock-body">
               {{stock_rows}}
             </tbody>
           </table>
         </section>
       </div>
-    </section>
+    </details>
     <script id="catalog-data" type="application/json">{{catalog_data_json}}</script>
+    <script id="current-state-data" type="application/json">{{current_state_json}}</script>
     <script>
       const catalogDataNode = document.getElementById("catalog-data");
+      const currentStateDataNode = document.getElementById("current-state-data");
+      const partnerField = document.getElementById("partner");
       const scriptField = document.getElementById("script");
       const catalogEntries = catalogDataNode ? JSON.parse(catalogDataNode.textContent) : [];
+      let currentState = currentStateDataNode ? JSON.parse(currentStateDataNode.textContent) : {
+        delivery_requests: [],
+        sales_reports: [],
+        stock: [],
+      };
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function renderDeliveryRequests(rows) {
+        const body = document.getElementById("delivery-requests-body");
+        if (!body) {
+          return;
+        }
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="3" class="empty-state">No delivery requests</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map((entry) => (
+          `<tr><td>${escapeHtml(entry.id)}</td><td>${escapeHtml(entry.status)}</td><td><code>${escapeHtml(entry.items)}</code></td></tr>`
+        )).join("");
+      }
+
+      function renderSalesReports(rows) {
+        const body = document.getElementById("sales-reports-body");
+        if (!body) {
+          return;
+        }
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="3" class="empty-state">No sales reports</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map((entry) => (
+          `<tr><td>${escapeHtml(entry.id)}</td><td>${entry.voided ? "yes" : "no"}</td><td><code>${escapeHtml(entry.items)}</code></td></tr>`
+        )).join("");
+      }
+
+      function renderStock(rows) {
+        const body = document.getElementById("stock-body");
+        if (!body) {
+          return;
+        }
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="2" class="empty-state">No stock</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map((entry) => (
+          `<tr><td><code>${escapeHtml(entry.book_id)}</code></td><td>${escapeHtml(entry.quantity)}</td></tr>`
+        )).join("");
+      }
+
+      function renderCurrentState(state) {
+        renderDeliveryRequests(state.delivery_requests || []);
+        renderSalesReports(state.sales_reports || []);
+        renderStock(state.stock || []);
+      }
 
       function insertCatalogSlug(slug) {
         if (!scriptField) {
@@ -236,6 +311,23 @@
           insertCatalogSlug(button.dataset.slug || "");
         });
       });
+
+      async function refreshCurrentState(partnerId) {
+        const response = await fetch(`/current-state?partner_id=${encodeURIComponent(partnerId)}`);
+        if (!response.ok) {
+          return;
+        }
+        currentState = await response.json();
+        renderCurrentState(currentState);
+      }
+
+      if (partnerField) {
+        partnerField.addEventListener("change", () => {
+          refreshCurrentState(partnerField.value);
+        });
+      }
+
+      renderCurrentState(currentState);
     </script>
   </body>
 </html>

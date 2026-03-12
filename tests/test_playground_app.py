@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from playground.app import get_catalog, render_page
+from playground.app import get_catalog, get_current_state, render_page
 from playground.views import list_scenarios
 
 
@@ -58,12 +58,16 @@ def test_render_page_shows_current_state_panels():
     )
 
     assert "Current State" in html
+    assert "state-drawer" in html
     assert "Delivery Requests" in html
     assert "Sales Reports" in html
     assert "Stock" in html
     assert "DELIVERED" in html
     assert "ghetto-barreau*2" in html
     assert "ghetto-barreau*1" in html
+    assert 'id="partner"' in html
+    assert 'id="current-state-data"' in html
+    assert "/current-state?partner_id=" in html
 
 
 def test_render_page_includes_available_scenarios():
@@ -71,3 +75,15 @@ def test_render_page_includes_available_scenarios():
 
     for scenario_name in list_scenarios():
         assert scenario_name in html
+
+
+def test_current_state_endpoint_returns_state_shape():
+    response = asyncio.run(get_current_state("luigi"))
+
+    assert response.status_code == 200
+    payload = json.loads(response.body)
+
+    assert set(payload) == {"delivery_requests", "sales_reports", "stock"}
+    assert isinstance(payload["delivery_requests"], list)
+    assert isinstance(payload["sales_reports"], list)
+    assert isinstance(payload["stock"], list)

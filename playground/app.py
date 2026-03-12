@@ -60,6 +60,12 @@ async def get_catalog() -> JSONResponse:
     return JSONResponse(catalog_entries())
 
 
+@app.get("/current-state", response_class=JSONResponse)
+async def get_current_state(partner_id: str = PARTNERS[0]) -> JSONResponse:
+    runtime = _make_runtime(partner_id if partner_id in PARTNERS else PARTNERS[0])
+    return JSONResponse(get_partner_current_state(runtime.ctx, runtime.partner_id))
+
+
 @app.post("/run", response_class=HTMLResponse)
 async def run_script(request: Request) -> HTMLResponse:
     payload = parse_qs((await request.body()).decode("utf-8"))
