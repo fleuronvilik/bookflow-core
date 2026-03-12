@@ -4,6 +4,7 @@ import asyncio
 import json
 
 from playground.app import get_catalog, render_page
+from playground.views import list_scenarios
 
 
 def test_render_page_shows_catalog_sidebar_and_insert_help():
@@ -63,3 +64,10 @@ def test_render_page_shows_current_state_panels():
     assert "DELIVERED" in html
     assert "ghetto-barreau*2" in html
     assert "ghetto-barreau*1" in html
+
+
+def test_render_page_includes_available_scenarios():
+    html = render_page()
+
+    for scenario_name in list_scenarios():
+        assert scenario_name in html
