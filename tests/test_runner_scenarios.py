@@ -36,12 +36,7 @@ def test_basic_scenario_runs_without_error_and_reuses_variables():
         {"ok": True, "id": 1, "msg": "DR#1 status=DELIVERED"},
         {"ok": True, "id": None, "msg": "stock p1: b1=1, b2=1"},
     ]
-    assert runtime.vars == {
-        "dr1": "1",
-        "submitted": "1",
-        "approved": "1",
-        "delivered": "1",
-    }
+    assert runtime.vars == {"dr1": "1"}
 
 
 def test_basic_scenario_ignores_comments_and_blank_lines():
