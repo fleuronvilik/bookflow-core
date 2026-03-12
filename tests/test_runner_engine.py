@@ -1,7 +1,7 @@
 from app.support.event_order import EventOrder
 from runner.dispatch import RunnerRuntime
 from runner.engine import run_file, run_lines
-from scripts.common import admin, make_ctx, partner
+from runner.cli_utils import admin, make_ctx, partner
 
 
 def make_runtime() -> RunnerRuntime:

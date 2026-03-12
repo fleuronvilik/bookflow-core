@@ -1,7 +1,7 @@
 from domain.delivery_request import Status
 from runner.dispatch import COMMANDS, QUERIES, RunnerRuntime, dispatch_parsed
 from runner.parser import ParsedLine
-from scripts.common import admin, make_ctx, partner
+from runner.cli_utils import admin, make_ctx, partner
 from app.support.event_order import EventOrder
 
 

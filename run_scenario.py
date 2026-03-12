@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.support.event_order import EventOrder
 from runner import RunnerRuntime, run_file
-from scripts.common import admin, make_ctx, partner
+from runner.cli_utils import admin, make_ctx, partner
 
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "scenarios"
