@@ -1,25 +1,37 @@
 from __future__ import annotations
 
 from html import escape
+import json
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.bootstrap import admin, make_ctx, partner
 from runner import RunnerRuntime, run_lines
 
 
 PARTNERS = ("luigi", "mario", "peach")
+CATALOG = (
+    "ghetto-barreau",
+    "reussir-mariage",
+    "bien-penser",
+    "connaissance-succes",
+    "creer-richesse",
+    "perception-divine",
+    "maitriser-epargne",
+    "aider-enfants",
+    "servir-dieu",
+)
 SCENARIOS_DIR = Path(__file__).resolve().parent / "scenarios"
 
 app = FastAPI()
 
 
 def make_runtime(partner_id: str) -> RunnerRuntime:
-    ctx = make_ctx()
+    ctx = make_ctx(False, CATALOG)
     return RunnerRuntime(
         ctx=ctx,
         partner_id=partner_id,
@@ -36,6 +48,10 @@ def load_scenario(name: str) -> str:
     if name not in set(list_scenarios()):
         return ""
     return (SCENARIOS_DIR / name).read_text(encoding="utf-8")
+
+
+def catalog_entries() -> tuple[dict[str, str], ...]:
+    return tuple({"slug": slug, "title": slug} for slug in CATALOG)
 
 
 def render_page(
@@ -56,6 +72,16 @@ def render_page(
         f"{' selected' if name == selected_scenario else ''}>"
         f"{escape(name)}</option>"
         for name in list_scenarios()
+    )
+    catalog_html = "\n".join(
+        (
+            '<li class="catalog-item">'
+            f'<button type="button" class="catalog-insert" data-slug="{escape(item["slug"])}">'
+            f'{escape(item["slug"])}'
+            "</button>"
+            "</li>"
+        )
+        for item in catalog_entries()
     )
 
     results_html = ""
@@ -97,6 +123,45 @@ def render_page(
       .scenario-controls label {{
         flex: 1;
       }}
+      .main-grid {{
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+        align-items: start;
+      }}
+      .panel {{
+        border: 1px solid #d9d9d9;
+        background: #fafafa;
+        padding: 1rem;
+        border-radius: 0.5rem;
+      }}
+      .placeholder {{
+        color: #666;
+      }}
+      .catalog-help {{
+        color: #666;
+        font-size: 0.95rem;
+        margin: 0.5rem 0 1rem;
+      }}
+      .catalog-list {{
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.5rem;
+      }}
+      .catalog-item {{
+        margin: 0;
+      }}
+      .catalog-insert {{
+        width: 100%;
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #d9d9d9;
+        border-radius: 0.4rem;
+        background: #fff;
+        cursor: pointer;
+      }}
       label {{
         display: grid;
         gap: 0.5rem;
@@ -115,11 +180,20 @@ def render_page(
         width: fit-content;
         padding: 0.75rem 1.25rem;
       }}
+      textarea {{
+        width: 100%;
+        box-sizing: border-box;
+      }}
       pre {{
         background: #f4f4f4;
         padding: 1rem;
         overflow-x: auto;
         white-space: pre-wrap;
+      }}
+      @media (max-width: 800px) {{
+        .main-grid {{
+          grid-template-columns: 1fr;
+        }}
       }}
     </style>
   </head>
@@ -144,13 +218,49 @@ def render_page(
           <button type="submit" name="action" value="load">Load</button>
         </div>
       </div>
-      <label>
-        DSL script
-        <textarea name="script">{escape(script)}</textarea>
-      </label>
-      <button type="submit">Run</button>
+      <div class="main-grid">
+        <aside class="panel">
+          <strong>Catalog</strong>
+          <p class="catalog-help">Click a slug to insert <code>slug*1</code> into the script.</p>
+          <ul class="catalog-list">
+            {catalog_html}
+          </ul>
+        </aside>
+        <section>
+          <label>
+            DSL script
+            <textarea id="script" name="script">{escape(script)}</textarea>
+          </label>
+          <button type="submit" name="action" value="run">Run</button>
+        </section>
+      </div>
     </form>
     {results_html}
+    <section class="panel placeholder">
+      <strong>Current State (coming soon)</strong>
+    </section>
+    <script id="catalog-data" type="application/json">{escape(json.dumps(catalog_entries()))}</script>
+    <script>
+      const catalogDataNode = document.getElementById("catalog-data");
+      const scriptField = document.getElementById("script");
+
+      function insertCatalogSlug(slug) {{
+        if (!scriptField) {{
+          return;
+        }}
+
+        const token = `${{slug}}*1`;
+        const currentValue = scriptField.value;
+        scriptField.value = currentValue ? `${{currentValue}}\\n${{token}}` : token;
+        scriptField.focus();
+      }}
+
+      document.querySelectorAll(".catalog-insert").forEach((button) => {{
+        button.addEventListener("click", () => {{
+          insertCatalogSlug(button.dataset.slug || "");
+        }});
+      }});
+    </script>
   </body>
 </html>
 """
@@ -159,6 +269,11 @@ def render_page(
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     return HTMLResponse(render_page())
+
+
+@app.get("/catalog", response_class=JSONResponse)
+async def get_catalog() -> JSONResponse:
+    return JSONResponse(catalog_entries())
 
 
 @app.post("/run", response_class=HTMLResponse)
