@@ -1,0 +1,12 @@
+# Two drafts are allowed, but only one active DR at a time
+
+P create items=b1*2 -> dr1
+P create items=b2*2 -> dr2
+
+P submit dr=$dr1 -> active1
+
+# This second submit must fail because dr1 is already active
+P submit dr=$dr2 -> active2
+
+# Must never run because the runner stops on first error
+show dr=$dr2

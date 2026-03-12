@@ -1,0 +1,11 @@
+# Basic delivery request lifecycle
+
+P create items=b1*1;b2*1 -> dr1
+show dr=$dr1
+
+P submit dr=$dr1 -> submitted
+A approve dr=$dr1 -> approved
+A deliver dr=$dr1 -> delivered
+
+show dr=$dr1
+stock partner=P
