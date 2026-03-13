@@ -21,10 +21,10 @@ def load_scenario(name: str) -> list[str]:
     return (SCENARIOS_DIR / name).read_text().splitlines()
 
 
-def test_basic_scenario_runs_without_error_and_reuses_variables():
+def test_dr_happy_path_scenario_runs_without_error_and_reuses_variables():
     runtime = make_runtime()
 
-    results = run_lines(runtime, load_scenario("basic.txt"))
+    results = run_lines(runtime, load_scenario("dr_happy_path.txt"))
 
     assert results == [
         {"ok": True, "id": 1, "msg": "created dr 1"},
@@ -35,27 +35,22 @@ def test_basic_scenario_runs_without_error_and_reuses_variables():
         {"ok": True, "id": 1, "msg": "DR#1 status=DELIVERED"},
         {"ok": True, "id": None, "msg": "stock p1: b1=1, b2=1"},
     ]
-    assert runtime.vars == {
-        "dr1": "1",
-        "submitted": "1",
-        "approved": "1",
-        "delivered": "1",
-    }
+    assert runtime.vars == {"dr1": "1"}
 
 
-def test_basic_scenario_ignores_comments_and_blank_lines():
+def test_dr_happy_path_scenario_ignores_comments_and_blank_lines():
     runtime = make_runtime()
 
-    results = run_lines(runtime, load_scenario("basic.txt"))
+    results = run_lines(runtime, load_scenario("dr_happy_path.txt"))
 
     assert len(results) == 7
     assert all(result["ok"] is True for result in results)
 
 
-def test_active_dr_scenario_stops_on_policy_violation():
+def test_single_active_dr_scenario_stops_on_policy_violation():
     runtime = make_runtime()
 
-    results = run_lines(runtime, load_scenario("active_dr.txt"))
+    results = run_lines(runtime, load_scenario("single_active_dr_constraint.txt"))
 
     assert results == [
         {"ok": True, "id": 1, "msg": "created dr 1"},
@@ -67,13 +62,15 @@ def test_active_dr_scenario_stops_on_policy_violation():
             "msg": "line 9: ActiveDeliveryRequestExists",
         },
     ]
-    assert runtime.vars == {"dr1": "1", "dr2": "2", "active1": "1"}
+    assert runtime.vars == {"dr1": "1", "dr2": "2"}
 
 
 def test_report_required_scenario_stops_on_policy_violation():
     runtime = make_runtime()
 
-    results = run_lines(runtime, load_scenario("report_required.txt"))
+    results = run_lines(
+        runtime, load_scenario("sales_report_required_between_deliveries.txt")
+    )
 
     assert results == [
         {"ok": True, "id": 1, "msg": "created dr 1"},
@@ -87,19 +84,13 @@ def test_report_required_scenario_stops_on_policy_violation():
             "msg": "line 11: sales report required since last delivered delivery request",
         },
     ]
-    assert runtime.vars == {
-        "dr1": "1",
-        "submitted1": "1",
-        "approved1": "1",
-        "delivered1": "1",
-        "dr2": "2",
-    }
+    assert runtime.vars == {"dr1": "1", "dr2": "2"}
 
 
 def test_transversal_scenario_runs_without_error():
     runtime = make_runtime()
 
-    results = run_lines(runtime, load_scenario("transversal.txt"))
+    results = run_lines(runtime, load_scenario("sales_report_void_updates_stock.txt"))
 
     assert results == [
         {"ok": True, "id": 1, "msg": "created dr 1"},
@@ -113,11 +104,4 @@ def test_transversal_scenario_runs_without_error():
         {"ok": True, "id": 1, "msg": "SR#1 voided=True"},
         {"ok": True, "id": None, "msg": "stock p1: b1=2"},
     ]
-    assert runtime.vars == {
-        "dr1": "1",
-        "submitted1": "1",
-        "approved1": "1",
-        "delivered1": "1",
-        "sr1": "1",
-        "sr1_voided": "1",
-    }
+    assert runtime.vars == {"dr1": "1", "sr1": "1"}

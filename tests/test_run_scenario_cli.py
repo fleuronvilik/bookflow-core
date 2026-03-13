@@ -23,7 +23,7 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_run_scenario_cli_runs_named_scenario():
-    proc = run_cli("p1", "basic")
+    proc = run_cli("p1", "dr_happy_path")
 
     assert proc.returncode == 0
     assert proc.stdout.splitlines() == [
@@ -38,7 +38,7 @@ def test_run_scenario_cli_runs_named_scenario():
 
 
 def test_run_scenario_cli_returns_error_on_failed_scenario():
-    proc = run_cli("p1", "active_dr")
+    proc = run_cli("p1", "single_active_dr_constraint")
 
     assert proc.returncode == 1
     assert proc.stdout.splitlines() == [

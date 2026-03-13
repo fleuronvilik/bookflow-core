@@ -1,0 +1,14 @@
+# DR + SR + stock + void
+
+P create items=b1*2 -> dr1
+P submit dr=$dr1
+A approve dr=$dr1
+A deliver dr=$dr1
+
+P report items=b1*2 -> sr1
+show sr=$sr1
+stock partner=P
+
+A void sr=$sr1 reason=mistake
+show sr=$sr1
+stock partner=P
