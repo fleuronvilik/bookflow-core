@@ -47,12 +47,12 @@ def render_result(result: dict[str, bool | int | None | str]) -> str:
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     testing = os.getenv("BOOK_DEPOT_TESTING") == "1"
-    if len(args) != 2:
-        print("usage: python run_scenario.py <partner-id> <scenario-path-or-name>")
+    if len(args) != 3 or args[0] != "-p":
+        print("usage: python run_scenario.py -p <partner-id> <scenario-path-or-name>")
         return 2
 
     try:
-        partner_id, raw_path = args
+        _, partner_id, raw_path = args
         scenario_path = resolve_scenario_path(raw_path)
         with redirect_stdout(StringIO()):
             results = run_file(make_runtime(partner_id, testing=testing), scenario_path)
