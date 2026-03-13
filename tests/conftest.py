@@ -90,13 +90,13 @@ def conn():
 
 
 @pytest.fixture
-def dr_repo(conn) -> SqlDeliveryRequestRepo:
-    return SqlDeliveryRequestRepo(conn)
+def dr_repo(conn) -> TestSqlDeliveryRequestRepo:
+    return TestSqlDeliveryRequestRepo(conn)
 
 
 @pytest.fixture
-def sr_repo(conn) -> SqlSalesReportRepo:
-    return SqlSalesReportRepo(conn)
+def sr_repo(conn) -> TestSqlSalesReportRepo:
+    return TestSqlSalesReportRepo(conn)
 
 
 @pytest.fixture
