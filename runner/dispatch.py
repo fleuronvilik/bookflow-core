@@ -11,8 +11,8 @@ from app.use_cases import (
     submit_delivery_request,
     submit_sales_report,
     void_sales_report,
-    get_sr_or_raise,
-    get_dr_or_raise,
+    get_sales_report,
+    get_delivery_request,
 )
 from domain.delivery_request import RequestItem
 from domain.sales_report import ReportItem
@@ -90,12 +90,12 @@ def run_show(runtime: RunnerRuntime, parsed: ParsedLine) -> RunnerResult:
     if "dr" in parsed.args:
         dr_id = int(parsed.args["dr"])
         # dr = runtime.ctx.dr_repo.get(dr_id)
-        dr = get_dr_or_raise(runtime.ctx, dr_id)
+        dr = get_delivery_request(runtime.ctx, runtime.admin_actor, dr_id)
         return _ok(dr_id, f"DR#{dr_id} status={dr.status.value}")
 
     sr_id = int(parsed.args["sr"])
     # sr = runtime.ctx.sr_repo.get(sr_id)
-    sr = get_sr_or_raise(runtime.ctx, sr_id)
+    sr = get_sales_report(runtime.ctx, runtime.admin_actor, sr_id)
     return _ok(sr_id, f"SR#{sr_id} voided={sr.voided}")
 
 

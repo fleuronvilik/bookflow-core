@@ -4,14 +4,14 @@ from .errors import NotFound
 
 
 def get_dr_or_raise(ctx: Context, dr_id: int):
-    try:
-        return ctx.dr_repo.get(dr_id)
-    except Exception:
+    dr = ctx.dr_repo.get(dr_id)
+    if not dr:
         raise NotFound(f"delivery request not found: {dr_id}")
+    return dr
 
 
 def get_sr_or_raise(ctx: Context, sr_id: int):
-    try:
-        return ctx.sr_repo.get(sr_id)
-    except Exception:
+    sr = ctx.sr_repo.get(sr_id)
+    if not sr:
         raise NotFound(f"sales report not found: {sr_id}")
+    return sr

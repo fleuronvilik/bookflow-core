@@ -1,4 +1,5 @@
 from typing import List
+
 from domain.delivery_request import DeliveryRequest, RequestItem, Status as DRStatus
 from domain.sales_report import SalesReport, ReportItem
 from policies.identity import Actor, Role
@@ -25,7 +26,7 @@ def given_draft_dr(ctx, partner_id: str, items=None) -> int:
         items = default_items()
 
     dr = DeliveryRequest.save_draft(partner_id=partner_id, items=items)
-    return ctx.dr_repo.add(dr)
+    return ctx.dr_repo.create(dr)
 
 
 def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
@@ -48,6 +49,7 @@ def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
         dr.approve()
         dr.mark_delivered()
 
+    ctx.dr_repo.save_status(dr_id, dr.status)
     return dr_id
 
 
@@ -55,4 +57,4 @@ def given_sr(
     ctx, partner_id: str, items=[ReportItem(book_id="b2", quantity=2)], voided=False
 ) -> int:
     sr = SalesReport(partner_id=partner_id, items=items, voided=voided)
-    return ctx.sr_repo.add(sr)
+    return ctx.sr_repo.create(sr)

@@ -6,6 +6,8 @@ from domain.delivery_request import (
 from domain.sales_report import SalesReport
 from domain.errors import InvalidReport
 from app.repositories import InMemoryDeliveryRequestRepo, InMemorySalesReportRepo
+from infra.sql.sql_delivery_request_repo import SqlDeliveryRequestRepo
+from infra.sql.sql_sales_report_repo import SqlSalesReportRepo
 from .stock_projection import compute_partner_stock
 
 
@@ -35,21 +37,21 @@ def validate_request_items_in_catalog(
 def validate_sales_report_against_stock(
     *,
     report: SalesReport,
-    dr_repo: InMemoryDeliveryRequestRepo,
-    sr_repo: InMemorySalesReportRepo,
+    dr_repo: SqlDeliveryRequestRepo,
+    sr_repo: SqlSalesReportRepo,
 ) -> None:
     """
     Stock entrant (par book_id) = somme des DR DELIVERED pour ce partner.
     Stock sortant = somme des SR déjà soumis (persistés) pour ce partner.
     Règle: sortant_existant + sortant_nouveau <= entrant, pour chaque book_id du report.
     """
-    stock = compute_partner_stock(report.partner_id, dr_repo, sr_repo)
+    stock = compute_partner_stock(report.partner_id, dr_repo=dr_repo, sr_repo=sr_repo)
     violations = []
     for it in report.items:
-        available = stock[it.book_id]
+        available = stock.get(it.book_id, 0)
         if it.quantity > available:
             violations.append(
-                f"{it.book_id} (asked {it.quantity}, available {available})"
+                f"{it.book_id} (reported {it.quantity}, available {available})"
             )
 
     if violations:

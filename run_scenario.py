@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import os
 import sys
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
-from app.support.event_order import EventOrder
+from app.bootstrap import admin, make_ctx, partner
 from runner import RunnerRuntime, run_file
-from runner.cli_utils import admin, make_ctx, partner
 
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "scenarios"
@@ -30,11 +30,11 @@ def resolve_scenario_path(raw_path: str) -> Path:
     raise FileNotFoundError(f"scenario not found: {raw_path}")
 
 
-def make_runtime() -> RunnerRuntime:
+def make_runtime(partner_id: str, *, testing: bool = False) -> RunnerRuntime:
     return RunnerRuntime(
-        ctx=make_ctx(EventOrder()),
-        partner_id="p1",
-        partner_actor=partner("p1"),
+        ctx=make_ctx(testing=testing),
+        partner_id=partner_id,
+        partner_actor=partner(partner_id),
         admin_actor=admin(),
     )
 
@@ -46,14 +46,16 @@ def render_result(result: dict[str, bool | int | None | str]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1:
-        print("usage: python run_scenario.py <scenario-path-or-name>")
+    testing = os.getenv("BOOK_DEPOT_TESTING") == "1"
+    if len(args) != 3 or args[0] != "-p":
+        print("usage: python run_scenario.py -p <partner-id> <scenario-path-or-name>")
         return 2
 
     try:
-        scenario_path = resolve_scenario_path(args[0])
+        _, partner_id, raw_path = args
+        scenario_path = resolve_scenario_path(raw_path)
         with redirect_stdout(StringIO()):
-            results = run_file(make_runtime(), scenario_path)
+            results = run_file(make_runtime(partner_id, testing=testing), scenario_path)
     except Exception as exc:
         print(f"ERR  {exc}")
         return 1
