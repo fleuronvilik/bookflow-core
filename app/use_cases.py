@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+from domain.partner_inventory import PartnerInventory, InsufficientStock
 from domain.delivery_request import RequestItem, DeliveryRequest
 from domain.sales_report import AlreadyVoided, SalesReport, ReportItem
 from policies.identity import Forbidden, Role, Actor
@@ -10,7 +11,6 @@ from policies.active_delivery_request import (
 from policies.validations import (
     validate_report_items_in_catalog,
     validate_request_items_in_catalog,
-    validate_sales_report_against_stock,
 )
 from .context import Context
 from .helpers import get_dr_or_raise, get_sr_or_raise
@@ -112,6 +112,14 @@ def mark_delivered(
     dr = get_dr_or_raise(ctx, dr_id)
     dr.mark_delivered()
     ctx.dr_repo.save_status(dr_id, dr.status)
+    for items in dr.items:
+        pi = ctx.pi_repo.get(dr.partner_id, items.book_id)
+        if pi is None:
+            pi = PartnerInventory(
+                partner_id=dr.partner_id, book_sku=items.book_id, current_quantity=0
+            )
+        pi.deliver(items.quantity)
+        ctx.pi_repo.save(pi)
     return dr_id, dr
 
 
@@ -124,10 +132,25 @@ def submit_sales_report(
 
     report = SalesReport(partner_id=actor.partner_id, items=payload)  # invariants SR
     validate_report_items_in_catalog(report, ctx.catalog)  # policy externe
-    validate_sales_report_against_stock(
-        report=report, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
-    )
+    # validate_sales_report_against_stock(
+    #     report=report, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
+    # )
+    # update_report_quantities_against_stock(report, ctx.pi_repo)
+    working = {}
+    for it in report.items:
+        key = (report.partner_id, it.book_id)
+        if key not in working:
+            pi = ctx.pi_repo.get(report.partner_id, it.book_id)
+            if pi is None:
+                raise InsufficientStock(
+                    f"Cannot report sale of {it.quantity} for {it.book_id}, no copy available"
+                )
+            pi.reportSale(it.quantity)
+            working[key] = pi.clone()
+
     sr_id = ctx.sr_repo.create(report)  # persistance mémoire
+    for pi in working.values():
+        ctx.pi_repo.save(pi)
     return sr_id, report
 
 
@@ -143,6 +166,12 @@ def void_sales_report(
     sr = get_sr_or_raise(ctx, sr_id)
     if sr.voided:
         raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
+
+    for it in sr.items:
+        pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
+        pi.restoreSales(it.quantity)
+        ctx.pi_repo.save(pi)
+
     ctx.sr_repo.mark_void(sr_id)
 
     ctx.audit.record(

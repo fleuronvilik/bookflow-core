@@ -42,3 +42,14 @@ CREATE TABLE audit_events (
     reason TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE partner_inventories (
+    book_sku TEXT NOT NULL,
+    partner_id TEXT NOT NULL,
+    current_quantity INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    PRIMARY KEY (book_sku, partner_id),
+    CHECK (current_quantity >= 0),
+    CHECK (version >= 0),
+    CHECK (partner_id IN ('p1', 'p2', 'luigi', 'mario', 'peach', 'yoshi'))
+)

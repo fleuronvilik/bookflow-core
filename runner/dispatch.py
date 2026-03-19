@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.context import Context
-from app.helpers import get_dr_or_raise
+from app.queries import get_partner_inventory
 from app.use_cases import (
     approve_delivery_request,
     create_delivery_request,
@@ -17,7 +17,6 @@ from app.use_cases import (
 from domain.delivery_request import RequestItem
 from domain.sales_report import ReportItem
 from policies.identity import Actor
-from policies.stock_projection import compute_partner_stock
 from runner.parser import ParsedLine
 
 
@@ -100,11 +99,7 @@ def run_show(runtime: RunnerRuntime, parsed: ParsedLine) -> RunnerResult:
 
 
 def run_stock(runtime: RunnerRuntime, parsed: ParsedLine) -> RunnerResult:
-    stock = compute_partner_stock(
-        runtime.partner_id,
-        runtime.ctx.dr_repo,
-        runtime.ctx.sr_repo,
-    )
+    stock = get_partner_inventory(runtime.partner_id, runtime.ctx.pi_repo)
     if not stock:
         return _ok(None, f"stock {runtime.partner_id}: empty")
 
