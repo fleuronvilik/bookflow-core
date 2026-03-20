@@ -85,20 +85,27 @@ def reject_delivery_request(
     if reason is None or not str(reason).strip():
         raise ValidationError("reject reason is required")
 
-    dr = get_dr_or_raise(ctx, dr_id)
+    try:
+        dr = get_dr_or_raise(ctx, dr_id)
 
-    # Audit requis (si audit absent/KO -> on échoue)
-    ctx.audit.record(
-        {
-            "type": "DR_REJECTED",
-            "target_type": "delivery_request",
-            "target_id": dr_id,
-            "reason": reason,
-        }
-    )
+        # Audit requis (si audit absent/KO -> on échoue)
+        ctx.audit.record(
+            {
+                "type": "DR_REJECTED",
+                "target_type": "delivery_request",
+                "target_id": dr_id,
+                "reason": reason,
+            },
+            autocommit=False,
+        )
 
-    # Transition métier (idéalement: l'entité refuse si state != SUBMITTED)
-    dr.reject()
+        # Transition métier (idéalement: l'entité refuse si state != SUBMITTED)
+        dr.reject()
+        ctx.dr_repo.save_status(dr_id, dr.status, autocommit=False)
+        ctx.dr_repo.conn.commit()
+    except Exception:
+        ctx.dr_repo.conn.rollback()
+        raise
 
     return dr_id, dr
 
@@ -109,17 +116,22 @@ def mark_delivered(
     if actor.role is not Role.ADMIN:
         raise Forbidden("only ADMIN can mark a delivery request delivered")
 
-    dr = get_dr_or_raise(ctx, dr_id)
-    dr.mark_delivered()
-    ctx.dr_repo.save_status(dr_id, dr.status)
-    for items in dr.items:
-        pi = ctx.pi_repo.get(dr.partner_id, items.book_id)
-        if pi is None:
-            pi = PartnerInventory(
-                partner_id=dr.partner_id, book_sku=items.book_id, current_quantity=0
-            )
-        pi.deliver(items.quantity)
-        ctx.pi_repo.save(pi)
+    try:
+        dr = get_dr_or_raise(ctx, dr_id)
+        dr.mark_delivered()
+        for items in dr.items:
+            pi = ctx.pi_repo.get(dr.partner_id, items.book_id)
+            if pi is None:
+                pi = PartnerInventory(
+                    partner_id=dr.partner_id, book_sku=items.book_id, current_quantity=0
+                )
+            pi.deliver(items.quantity)
+            ctx.pi_repo.save(pi, autocommit=False)
+        ctx.dr_repo.save_status(dr_id, dr.status, autocommit=False)
+        ctx.dr_repo.conn.commit()
+    except Exception:
+        ctx.dr_repo.conn.rollback()
+        raise
     return dr_id, dr
 
 
@@ -132,10 +144,7 @@ def submit_sales_report(
 
     report = SalesReport(partner_id=actor.partner_id, items=payload)  # invariants SR
     validate_report_items_in_catalog(report, ctx.catalog)  # policy externe
-    # validate_sales_report_against_stock(
-    #     report=report, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
-    # )
-    # update_report_quantities_against_stock(report, ctx.pi_repo)
+
     working = {}
     for it in report.items:
         key = (report.partner_id, it.book_id)
@@ -146,11 +155,16 @@ def submit_sales_report(
                     f"Cannot report sale of {it.quantity} for {it.book_id}, no copy available"
                 )
             pi.reportSale(it.quantity)
-            working[key] = pi.clone()
+            working[key] = pi  # .clone()
 
-    sr_id = ctx.sr_repo.create(report)  # persistance mémoire
-    for pi in working.values():
-        ctx.pi_repo.save(pi)
+    try:
+        sr_id = ctx.sr_repo.create(report, autocommit=False)  # persistance mémoire
+        for pi in working.values():
+            ctx.pi_repo.save(pi, autocommit=False)
+        ctx.sr_repo.conn.commit()
+    except Exception:
+        ctx.sr_repo.conn.rollback()
+        raise
     return sr_id, report
 
 
@@ -167,53 +181,29 @@ def void_sales_report(
     if sr.voided:
         raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
 
-    for it in sr.items:
-        pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
-        pi.restoreSales(it.quantity)
-        ctx.pi_repo.save(pi)
+    try:
+        for it in sr.items:
+            pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
+            pi.restoreSales(it.quantity)
+            ctx.pi_repo.save(pi, autocommit=False)
 
-    ctx.sr_repo.mark_void(sr_id)
-
-    ctx.audit.record(
-        {
-            "type": "SR_VOIDED",
-            "target_type": "sales_report",
-            "target_id": sr_id,
-            "reason": reason,
-        }
-    )
+        ctx.sr_repo.mark_void(sr_id, autocommit=False)
+        ctx.audit.record(
+            {
+                "type": "SR_VOIDED",
+                "target_type": "sales_report",
+                "target_id": sr_id,
+                "reason": reason,
+            },
+            autocommit=False,
+        )
+        ctx.sr_repo.conn.commit()
+    except Exception:
+        ctx.sr_repo.conn.rollback()
+        raise
 
     # ctx.sr_repo.mark_void(sr_id)
     return sr_id, get_sr_or_raise(ctx, sr_id)
-
-
-# def list_reports_by_partner(
-#     *,
-#     actor: Actor,
-#     partner_id: str,
-#     sr_repo: InMemorySalesReportRepo,
-# ) -> List[SalesReport]:
-#     # Rule: ADMIN must provide a partner_id (no "list all" shortcut in this use-case).
-#     if actor.role is not Role.ADMIN:
-#         raise Forbidden("only ADMIN can list reports for an arbitrary partner")
-
-#     if not partner_id:
-#         raise ValueError("partner_id is required")
-
-#     return reports_by_partner(sr_repo.list_all(), partner_id)
-
-
-# def list_my_reports(
-#     *,
-#     actor: Actor,
-#     sr_repo: InMemorySalesReportRepo,
-# ) -> List[SalesReport]:
-#     # Rule: "my reports" is a PARTNER-only intention.
-#     if actor.role is not Role.PARTNER:
-#         raise Forbidden("only PARTNER can list their own reports")
-
-#     # Actor invariant guarantees partner_id is present for PARTNER.
-#     return reports_by_partner(sr_repo.list_all(), actor.partner_id)
 
 
 def get_sales_report(ctx: Context, actor: Actor, sr_id: int) -> SalesReport | None:

@@ -5,7 +5,7 @@ class SqlPartnerInventoryRepo:
     def __init__(self, conn):
         self.conn = conn
 
-    def save(self, partner_inventory):
+    def save(self, partner_inventory, autocommit=True):
         cur = self.conn.cursor()
         # pi = self.get(partner_inventory.partner_id, partner_inventory.book_sku)
 
@@ -22,7 +22,8 @@ class SqlPartnerInventoryRepo:
                 partner_inventory.version,
             ),
         )
-        self.conn.commit()
+        if autocommit:
+            self.conn.commit()
 
     def get(self, partner_id, book_sku):
         cur = self.conn.cursor()

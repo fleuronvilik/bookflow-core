@@ -70,7 +70,9 @@ class SqlDeliveryRequestRepo:
             items=items,
         )
 
-    def save_status(self, dr_id: int, status: DRStatus) -> int | None:
+    def save_status(
+        self, dr_id: int, status: DRStatus, autocommit: bool = True
+    ) -> int | None:
         cur = self.conn.cursor()
 
         # dr = self.get(dr_id)
@@ -86,5 +88,6 @@ class SqlDeliveryRequestRepo:
             (status, dr_id),
         )
 
-        self.conn.commit()
+        if autocommit:
+            self.conn.commit()
         return dr_id
