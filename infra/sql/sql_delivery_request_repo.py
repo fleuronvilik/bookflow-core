@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from app.errors import NotFound
 from domain.delivery_request import DeliveryRequest, RequestItem, Status as DRStatus
 
 
@@ -19,7 +18,6 @@ class SqlDeliveryRequestRepo:
         )
 
         dr_id = cur.lastrowid
-        # dr.id = dr_id
 
         for item in dr.items:
             book_sku = item.book_id
@@ -41,7 +39,7 @@ class SqlDeliveryRequestRepo:
 
         row = cur.execute(
             """
-            SELECT id, partner_id, status, created_at
+            SELECT id, partner_id, status
             FROM delivery_requests
             WHERE id = ?
             """,
@@ -49,7 +47,7 @@ class SqlDeliveryRequestRepo:
         ).fetchone()
 
         if row is None:
-            return
+            return None
 
         items_rows = cur.execute(
             """
@@ -63,31 +61,23 @@ class SqlDeliveryRequestRepo:
         items = [RequestItem(sku, qty) for sku, qty in items_rows]
 
         return DeliveryRequest(
-            # id=row[0],
+            id=row[0],
             partner_id=row[1],
             status=DRStatus(row[2]),
-            # created_at=row[3],
             items=items,
         )
 
-    def save_status(
-        self, dr_id: int, status: DRStatus, autocommit: bool = True
-    ) -> int | None:
+    def save_status(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
         cur = self.conn.cursor()
-
-        # dr = self.get(dr_id)
-        # if dr is None:
-        #     return None
-
         cur.execute(
             """
             UPDATE delivery_requests
             SET status = ?
             WHERE id = ?
             """,
-            (status, dr_id),
+            (dr.status.value, dr.id),
         )
 
         if autocommit:
             self.conn.commit()
-        return dr_id
+        return dr.id

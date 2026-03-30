@@ -1,5 +1,6 @@
 import pytest
 from domain.delivery_request import DeliveryRequest, RequestItem
+from app.helpers import get_dr_or_raise
 
 
 def test_create_and_get_dr(ctx):
@@ -18,15 +19,15 @@ def test_save_status(ctx):
     dr_id = ctx.dr_repo.create(dr)
 
     loaded = ctx.dr_repo.get(dr_id)
-    loaded.submit()
-    ctx.dr_repo.save_status(dr_id, loaded.status)
+    loaded = loaded.submit()
+    ctx.dr_repo.save_status(loaded)
 
     loaded = ctx.dr_repo.get(dr_id)
     assert loaded.status == "SUBMITTED"
 
     loaded = ctx.dr_repo.get(dr_id)
-    loaded.approve()
-    ctx.dr_repo.save_status(dr_id, loaded.status)
+    loaded = loaded.approve()
+    ctx.dr_repo.save_status(loaded)
 
     loaded = ctx.dr_repo.get(dr_id)
     assert loaded.status == "APPROVED"

@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
-from domain.partner_inventory import PartnerInventory, InsufficientStock
+from domain.errors import InsufficientStock
+from domain.partner_inventory import PartnerInventory
 from domain.delivery_request import RequestItem, DeliveryRequest
 from domain.sales_report import AlreadyVoided, SalesReport, ReportItem
 from policies.identity import Forbidden, Role, Actor
@@ -33,6 +34,7 @@ def create_delivery_request(
     validate_request_items_in_catalog(dr.items, ctx.catalog)
 
     dr_id = ctx.dr_repo.create(dr)
+    dr = get_dr_or_raise(ctx, dr_id)
     return dr_id, dr
 
 
@@ -57,8 +59,8 @@ def submit_delivery_request(
         partner_id=dr.partner_id, dr_repo=ctx.dr_repo, sr_repo=ctx.sr_repo
     )
 
-    dr.submit()
-    ctx.dr_repo.save_status(dr_id, dr.status)
+    dr = dr.submit()
+    ctx.dr_repo.save_status(dr)
     return dr_id, dr
 
 
@@ -70,8 +72,8 @@ def approve_delivery_request(
         raise Forbidden("only ADMIN can approve a delivery request")
 
     dr = get_dr_or_raise(ctx, dr_id)
-    dr.approve()
-    ctx.dr_repo.save_status(dr_id, dr.status)
+    dr = dr.approve()
+    ctx.dr_repo.save_status(dr)
     return dr_id, dr
 
 
@@ -100,8 +102,8 @@ def reject_delivery_request(
         )
 
         # Transition métier (idéalement: l'entité refuse si state != SUBMITTED)
-        dr.reject()
-        ctx.dr_repo.save_status(dr_id, dr.status, autocommit=False)
+        dr = dr.reject()
+        ctx.dr_repo.save_status(dr, autocommit=False)
         ctx.dr_repo.conn.commit()
     except Exception:
         ctx.dr_repo.conn.rollback()
@@ -118,7 +120,7 @@ def mark_delivered(
 
     try:
         dr = get_dr_or_raise(ctx, dr_id)
-        dr.mark_delivered()
+        dr = dr.mark_delivered()
         for items in dr.items:
             pi = ctx.pi_repo.get(dr.partner_id, items.book_id)
             if pi is None:
@@ -127,7 +129,7 @@ def mark_delivered(
                 )
             pi.deliver(items.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
-        ctx.dr_repo.save_status(dr_id, dr.status, autocommit=False)
+        ctx.dr_repo.save_status(dr, autocommit=False)
         ctx.dr_repo.conn.commit()
     except Exception:
         ctx.dr_repo.conn.rollback()

@@ -1,7 +1,7 @@
 # delivery_request.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import List
 
@@ -28,8 +28,9 @@ class RequestItem:
     quantity: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeliveryRequest:
+    id: int | None
     partner_id: str
     status: Status
     items: List[RequestItem]
@@ -66,28 +67,30 @@ class DeliveryRequest:
                 f"request minimum size is {cls.MIN_TOTAL_QUANTITY} (current size: {total})"
             )
 
-        return cls(partner_id=partner_id, status=Status.DRAFT, items=list(items))
+        return cls(
+            id=None, partner_id=partner_id, status=Status.DRAFT, items=list(items)
+        )
 
-    def mark_delivered(self) -> None:
+    def mark_delivered(self) -> DeliveryRequest:
         # Invariant dominant: DELIVERED seulement si APPROVED
         if self.status is not Status.APPROVED:
             raise InvalidTransition("DELIVERED only if APPROVED")
-        self.status = Status.DELIVERED
+        return replace(self, status=Status.DELIVERED)
 
-    def approve(self) -> None:
+    def approve(self) -> DeliveryRequest:
         if self.status is not Status.SUBMITTED:
             raise InvalidTransition("APPROVED only if SUBMITTED")
-        self.status = Status.APPROVED
+        return replace(self, status=Status.APPROVED)
 
-    def submit(self) -> None:
+    def submit(self) -> DeliveryRequest:
         if self.status is not Status.DRAFT:
             raise InvalidTransition("SUBMITTED only if DRAFT")
-        self.status = Status.SUBMITTED
+        return replace(self, status=Status.SUBMITTED)
 
-    def reject(self) -> None:
+    def reject(self) -> DeliveryRequest:
         if self.status != Status.SUBMITTED:
             raise InvalidTransition("REJECTED only if SUBMITTED")
-        self.status = Status.REJECTED
+        return replace(self, status=Status.REJECTED)
 
     def __str__(self):
         return self.status
