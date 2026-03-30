@@ -10,17 +10,16 @@ from app.use_cases import (
     submit_sales_report,
     void_sales_report,
 )
-from domain.errors import InvalidReport
+from domain.errors import InvalidReport, InsufficientStock
 from app.errors import NotFound, ValidationError
-from domain.sales_report import ReportItem, SalesReport, AlreadyVoided
+from domain.sales_report import ReportItem, AlreadyVoided
 from domain.delivery_request import (
     InvalidDeliveryRequest,
     Status,
     RequestItem,
-    DeliveryRequest,
 )
 from policies.identity import Forbidden, Role, Actor
-from policies.validations import InsufficientStock, compute_partner_stock
+from policies.stock_projection import compute_partner_stock
 from tests.helpers import given_dr, given_sr
 
 
@@ -56,17 +55,10 @@ def test_submit_sales_report_requires_known_book_ids(ctx, partner_actor):
 
 
 def test_submit_sales_report_rejects_quantities_gt_stock(ctx, partner_actor):
-    # Stock entrant: 1 exemplaire de b1 livré au partenaire
-    dr = DeliveryRequest.save_draft(
-        partner_id=partner_actor.partner_id,
-        items=[RequestItem(book_id="b1", quantity=2)],
-    )
-    dr.submit()
-    dr.approve()
-    dr.mark_delivered()
-    ctx.dr_repo.create(dr)
+    # Stock entrant: 1 de b1 et 3 de b2livré au partenaire
+    _ = given_dr(ctx, partner_actor.partner_id, Status.DELIVERED)
 
-    # Ventes déclarées: 2 exemplaires => dépasse le stock entrant (1)
+    # Ventes déclarées: 3 exemplaires => dépasse le stock entrant (2)
     with pytest.raises(InsufficientStock):
         submit_sales_report(
             ctx=ctx,
@@ -183,7 +175,7 @@ def test_create_delivery_request_requires_known_book_ids(ctx, partner_actor):
 
 
 def test_submit_allowed_when_no_previous_delivery_exists(ctx, partner_actor):
-    dr_id, dr = create_delivery_request(
+    dr_id, _ = create_delivery_request(
         ctx=ctx,
         actor=partner_actor,
         payload=[RequestItem(book_id="b1", quantity=2)],
@@ -263,6 +255,7 @@ def test_mark_delivered_dr_not_found(ctx, admin_actor):
 
 
 def test_void_sales_report_requires_admin(ctx, partner_actor):
+    _ = given_dr(ctx, partner_actor.partner_id, Status.DELIVERED)
     sr_id = given_sr(ctx, partner_actor.partner_id)
     with pytest.raises(Forbidden):
         void_sales_report(ctx, partner_actor, sr_id, "invalid report")
@@ -271,8 +264,9 @@ def test_void_sales_report_requires_admin(ctx, partner_actor):
     assert ctx.audit.list_all() == []
 
 
-def test_void_sales_report_requires_reason(ctx, admin_actor):
-    sr_id = given_sr(ctx, "p1")
+def test_void_sales_report_requires_reason(ctx, admin_actor, partner_actor):
+    _ = given_dr(ctx, partner_actor.partner_id, Status.DELIVERED)
+    sr_id = given_sr(ctx, partner_actor.partner_id)
     with pytest.raises(ValidationError):
         void_sales_report(ctx, admin_actor, sr_id, "")
 
@@ -287,6 +281,7 @@ def test_void_sales_report_not_found(ctx, admin_actor):
 
 def test_void_sales_report_happy_path(ctx, admin_actor):
     """voids_report_and_records_audit"""
+    _ = given_dr(ctx, "p1", Status.DELIVERED)
     sr_id = given_sr(ctx, "p1")
     _, report = void_sales_report(ctx, admin_actor, sr_id, "invalid report")
 
@@ -299,8 +294,9 @@ def test_void_sales_report_happy_path(ctx, admin_actor):
     assert audit_event["reason"] == "invalid report"
 
 
-def test_void_sales_report_already_voided_raises(ctx, admin_actor):
-    sr_id = given_sr(ctx, "p1")
+def test_void_sales_report_already_voided_raises(ctx, admin_actor, partner_actor):
+    _ = given_dr(ctx, partner_actor.partner_id, Status.DELIVERED)
+    sr_id = given_sr(ctx, partner_actor.partner_id)
     void_sales_report(ctx, admin_actor, sr_id, "invalid report")
     with pytest.raises(AlreadyVoided):
         void_sales_report(ctx, admin_actor, sr_id, "invalid report")
