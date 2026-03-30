@@ -1,5 +1,4 @@
-class InsufficientStock(Exception):
-    pass
+from domain.errors import InsufficientStock
 
 
 class PartnerInventory:
