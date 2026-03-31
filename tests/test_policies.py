@@ -1,12 +1,12 @@
 import pytest
 
 from domain.delivery_request import RequestItem, Status as DRStatus
-from app.use_cases import submit_delivery_request
-from domain.sales_report import ReportItem
+from app.use_cases import submit_delivery_request, void_sales_report
 from policies.active_delivery_request import ActiveDeliveryRequestExists
 from policies.identity import Actor, Role
+from policies.report_required import ReportRequired
 from policies.stock_projection import compute_partner_stock
-from tests.helpers import given_dr, given_sr
+from tests.helpers import default_items, given_dr, given_sr
 
 """ ARD: ActiveRequestDelivery policy """
 
@@ -70,84 +70,57 @@ def test_compute_partner_stock_empty(ctx):
     assert stock == {}
 
 
-def test_compute_partner_stock_with_deliveries_only(ctx):
-    _ = given_dr(
-        ctx, "p1", DRStatus.DELIVERED, items=[RequestItem(book_id="b1", quantity=3)]
-    )
+def test_compute_partner_stock_with_deliveries_only(ctx, partner_actor):
     _ = given_dr(
         ctx,
-        "p1",
+        partner_actor.partner_id,
         DRStatus.DELIVERED,
-        items=[
-            RequestItem(book_id="b1", quantity=2),
-            RequestItem(book_id="b2", quantity=5),
-        ],
     )
-    stock = compute_partner_stock("p1", ctx.dr_repo, ctx.sr_repo)
-    assert stock == {"b1": 5, "b2": 5}
+
+    # report required policy will prevent the following delivery to succeed
+    with pytest.raises(ReportRequired):
+        _ = given_dr(
+            ctx,
+            "p1",
+            DRStatus.DELIVERED,
+            items=[
+                RequestItem(book_id="b1", quantity=2),
+                RequestItem(book_id="b2", quantity=5),
+            ],
+        )
+    stock = compute_partner_stock(partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo)
+    assert stock == {r.book_id: r.quantity for r in default_items()}
 
 
-def test_compute_partner_stock_with_deliveries_and_sales(ctx):
-    _ = given_dr(
-        ctx, "p1", DRStatus.DELIVERED, items=[RequestItem(book_id="b1", quantity=3)]
-    )
-    _ = given_dr(
-        ctx,
-        "p1",
-        DRStatus.DELIVERED,
-        items=[
-            RequestItem(book_id="b1", quantity=2),
-            RequestItem(book_id="b2", quantity=5),
-        ],
-    )
-    _ = given_sr(
-        ctx,
-        "p1",
-        items=[
-            ReportItem(book_id="b1", quantity=4),
-            ReportItem(book_id="b2", quantity=1),
-        ],
-    )
-    stock = compute_partner_stock("p1", ctx.dr_repo, ctx.sr_repo)
-    assert stock == {"b1": 1, "b2": 4}
+def test_compute_partner_stock_with_deliveries_and_sales(ctx, partner_actor):
+    _ = given_dr(ctx, partner_actor.partner_id, DRStatus.DELIVERED)
+    _ = given_sr(ctx, partner_actor.partner_id)
+    stock = compute_partner_stock(partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo)
+    assert stock == {"b1": 2, "b2": 1}
 
 
 def test_compute_partner_stock_ignores_other_partners(ctx):
-    _ = given_dr(
-        ctx, "p1", DRStatus.DELIVERED, items=[RequestItem(book_id="b1", quantity=3)]
-    )
-    _ = given_dr(
-        ctx,
-        "p2",
-        DRStatus.DELIVERED,
-        items=[
-            RequestItem(book_id="b1", quantity=2),
-            RequestItem(book_id="b2", quantity=5),
-        ],
-    )
-    _ = given_sr(
-        ctx,
-        "p2",
-        items=[
-            ReportItem(book_id="b1", quantity=4),
-            ReportItem(book_id="b2", quantity=1),
-        ],
-    )
-    stock = compute_partner_stock("p1", ctx.dr_repo, ctx.sr_repo)
-    assert stock == {"b1": 3}
+    _ = given_dr(ctx, "p1", DRStatus.DELIVERED)
+    _ = given_dr(ctx, "p2", DRStatus.DELIVERED)
+    _ = given_sr(ctx, "p2")
+
+    stock_p1 = compute_partner_stock("p1", ctx.dr_repo, ctx.sr_repo)
+    assert stock_p1 == {"b1": 2, "b2": 3}
+
+    stock_p2 = compute_partner_stock("p2", ctx.dr_repo, ctx.sr_repo)
+    assert stock_p2 == {"b1": 2, "b2": 1}
 
 
-def test_compute_partner_stock_ignores_voided_sales(ctx):
-    _ = given_dr(
-        ctx, "p1", DRStatus.DELIVERED, items=[RequestItem(book_id="b1", quantity=3)]
+def test_compute_partner_stock_ignores_voided_sales(ctx, admin_actor, partner_actor):
+    _ = given_dr(ctx, partner_actor.partner_id, DRStatus.DELIVERED)
+    sr_id = given_sr(ctx, partner_actor.partner_id)
+    stock_before_void = compute_partner_stock(
+        partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo
     )
-    _ = given_sr(
-        ctx,
-        "p1",
-        items=[
-            ReportItem(book_id="b1", quantity=4),
-        ],
-        voided=True,
+    assert stock_before_void == {"b1": 2, "b2": 1}
+
+    void_sales_report(ctx, admin_actor, sr_id, reason="test void")
+    stock_after_void = compute_partner_stock(
+        partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo
     )
-    stock = compute_partner_stock("p1", ctx.dr_repo, ctx.sr_repo)
-    assert stock == {"b1": 3}
+    assert stock_after_void == {"b1": 2, "b2": 3}

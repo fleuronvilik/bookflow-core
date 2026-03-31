@@ -1,7 +1,12 @@
-from typing import List
-
+from app.use_cases import (
+    approve_delivery_request,
+    mark_delivered,
+    reject_delivery_request,
+    submit_delivery_request,
+    submit_sales_report,
+)
 from domain.delivery_request import DeliveryRequest, RequestItem, Status as DRStatus
-from domain.sales_report import SalesReport, ReportItem
+from domain.sales_report import ReportItem
 from policies.identity import Actor, Role
 
 
@@ -13,11 +18,17 @@ def admin_actor():
     return Actor(role=Role.ADMIN, partner_id=None)
 
 
-def default_items() -> List[RequestItem]:
+def default_items() -> list[RequestItem]:
     # respecte MinimumCopies = 2
     return [
         RequestItem(book_id="b1", quantity=2),
         RequestItem(book_id="b2", quantity=3),
+    ]
+
+
+def default_sales() -> list[ReportItem]:
+    return [
+        ReportItem(book_id="b2", quantity=2),
     ]
 
 
@@ -34,27 +45,30 @@ def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
     dr = ctx.dr_repo.get(dr_id)
 
     if status == DRStatus.SUBMITTED:
-        dr.submit()
+        _, dr = submit_delivery_request(ctx, partner_actor(partner_id), dr_id)
 
     elif status == DRStatus.APPROVED:
-        dr.submit()
-        dr.approve()
+        _, dr = submit_delivery_request(ctx, partner_actor(partner_id), dr_id)
+        _, dr = approve_delivery_request(ctx, admin_actor(), dr_id)
 
     elif status == DRStatus.REJECTED:
-        dr.submit()
-        dr.reject()
+        _, dr = submit_delivery_request(ctx, partner_actor(partner_id), dr_id)
+        _, dr = reject_delivery_request(ctx, admin_actor(), dr_id, reason="test reason")
 
     elif status == DRStatus.DELIVERED:
-        dr.submit()
-        dr.approve()
-        dr.mark_delivered()
+        _, dr = submit_delivery_request(ctx, partner_actor(partner_id), dr_id)
+        _, dr = approve_delivery_request(ctx, admin_actor(), dr_id)
+        _, dr = mark_delivered(ctx, admin_actor(), dr_id)
 
-    ctx.dr_repo.save_status(dr_id, dr.status)
     return dr_id
 
 
 def given_sr(
-    ctx, partner_id: str, items=[ReportItem(book_id="b2", quantity=2)], voided=False
+    ctx, partner_id: str, items: list[ReportItem] | None = None, voided: bool = False
 ) -> int:
-    sr = SalesReport(partner_id=partner_id, items=items, voided=voided)
-    return ctx.sr_repo.create(sr)
+    if items is None:
+        items = default_sales()
+    sr_id, _ = submit_sales_report(ctx, partner_actor(partner_id), items)
+    if voided:
+        ctx.sr_repo.mark_void(sr_id)
+    return sr_id

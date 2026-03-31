@@ -6,7 +6,7 @@ class SqlSalesReportRepo:
     def __init__(self, conn):
         self.conn = conn
 
-    def create(self, report: SalesReport) -> int:
+    def create(self, report: SalesReport, autocommit=True) -> int:
         cur = self.conn.cursor()
         is_voided = 1 if report.voided else 0
 
@@ -29,7 +29,8 @@ class SqlSalesReportRepo:
                 (report_id, item.book_id, item.quantity),
             )
 
-        self.conn.commit()
+        if autocommit:
+            self.conn.commit()
         return report_id
 
     def get(self, report_id: int) -> SalesReport | None:
@@ -59,12 +60,13 @@ class SqlSalesReportRepo:
         items = [ReportItem(book_id=r[0], quantity=r[1]) for r in items_rows]
 
         return SalesReport(
+            id=row[0],
             partner_id=row[1],
             voided=bool(row[2]),
             items=items,
         )
 
-    def mark_void(self, report_id: int) -> int | None:
+    def mark_void(self, report_id: int, autocommit=True) -> int | None:
         cur = self.conn.cursor()
 
         cur.execute(
@@ -75,6 +77,6 @@ class SqlSalesReportRepo:
             """,
             (report_id,),
         )
-
-        self.conn.commit()
+        if autocommit:
+            self.conn.commit()
         return report_id

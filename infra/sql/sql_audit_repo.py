@@ -9,7 +9,7 @@ class SqlAuditRepo:
     def __init__(self, conn):
         self.conn = conn
 
-    def record(self, event: dict) -> int:
+    def record(self, event: dict, autocommit=True) -> int:
         event_type = event["type"]
         reason = event.get("reason")
 
@@ -42,7 +42,8 @@ class SqlAuditRepo:
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
-        self.conn.commit()
+        if autocommit:
+            self.conn.commit()
         return cur.lastrowid
 
     def get(self, event_id: int) -> dict | None:

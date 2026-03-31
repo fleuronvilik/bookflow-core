@@ -6,6 +6,7 @@ import pytest
 from app.context import Context
 from infra.sql.sql_audit_repo import SqlAuditRepo
 from infra.sql.sql_delivery_request_repo import SqlDeliveryRequestRepo
+from infra.sql.sql_partner_inventory_repo import SqlPartnerInventoryRepo
 from infra.sql.sql_sales_report_repo import SqlSalesReportRepo
 from domain.delivery_request import DeliveryRequest, Status as DRStatus
 from domain.sales_report import SalesReport
@@ -36,8 +37,8 @@ class TestSqlDeliveryRequestRepo(SqlDeliveryRequestRepo):
         ]
         return [(dr_id, self.get(dr_id)) for dr_id in ids]
 
-    def save_status(self, dr_id: int, status: DRStatus) -> int | None:
-        return super().save_status(dr_id, status.value)
+    def save(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
+        return super().save(dr, autocommit)
 
 
 class TestSqlSalesReportRepo(SqlSalesReportRepo):
@@ -100,8 +101,24 @@ def sr_repo(conn) -> TestSqlSalesReportRepo:
 
 
 @pytest.fixture
-def ctx(catalog, conn, dr_repo, sr_repo) -> Context:
-    return Context(catalog, dr_repo, sr_repo, SqlAuditRepo(conn))
+def pi_repo(conn) -> SqlPartnerInventoryRepo:
+    return SqlPartnerInventoryRepo(conn)
+
+
+@pytest.fixture
+def audit_repo(conn) -> SqlAuditRepo:
+    return SqlAuditRepo(conn)
+
+
+@pytest.fixture
+def ctx(catalog, dr_repo, sr_repo, pi_repo, audit_repo) -> Context:
+    return Context(
+        catalog,
+        dr_repo,
+        sr_repo,
+        pi_repo,
+        audit_repo,
+    )
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 # report_required.py
 from __future__ import annotations
-from typing import Optional
 
 
 from infra.sql.sql_delivery_request_repo import SqlDeliveryRequestRepo
@@ -35,7 +34,7 @@ def ensure_report_submitted_since_last_delivery(
         (partner_id,),
     )
     last_delivered_row = cur.fetchone()
-    last_delivered_seq: Optional[int] = None
+    last_delivered_seq: int | None = None
     if last_delivered_row:
         last_delivered_seq = last_delivered_row[0]
 
