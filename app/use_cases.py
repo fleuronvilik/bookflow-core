@@ -187,6 +187,8 @@ def void_sales_report(
     try:
         for it in sr.items:
             pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
+            if pi is None:
+                return sr_id, sr
             pi = pi.restore_sales(it.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
 

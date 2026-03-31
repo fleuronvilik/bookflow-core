@@ -63,10 +63,12 @@ def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
     return dr_id
 
 
-def given_sr(ctx, partner_id: str, items: list[ReportItem] = [], voided=False) -> int:
-    if not items:
+def given_sr(
+    ctx, partner_id: str, items: list[ReportItem] | None = None, voided: bool = False
+) -> int:
+    if items is None:
         items = default_sales()
     sr_id, _ = submit_sales_report(ctx, partner_actor(partner_id), items)
     if voided:
-        ctx.sr_repo.void(sr_id)
+        ctx.sr_repo.mark_void(sr_id)
     return sr_id

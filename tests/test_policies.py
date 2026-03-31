@@ -114,13 +114,13 @@ def test_compute_partner_stock_ignores_other_partners(ctx):
 
 def test_compute_partner_stock_ignores_voided_sales(ctx, admin_actor, partner_actor):
     _ = given_dr(ctx, partner_actor.partner_id, DRStatus.DELIVERED)
-    _ = given_sr(ctx, partner_actor.partner_id)
+    sr_id = given_sr(ctx, partner_actor.partner_id)
     stock_before_void = compute_partner_stock(
         partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo
     )
     assert stock_before_void == {"b1": 2, "b2": 1}
 
-    void_sales_report(ctx, admin_actor, 1, reason="test void")
+    void_sales_report(ctx, admin_actor, sr_id, reason="test void")
     stock_after_void = compute_partner_stock(
         partner_actor.partner_id, ctx.dr_repo, ctx.sr_repo
     )
