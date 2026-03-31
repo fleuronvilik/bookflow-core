@@ -91,5 +91,5 @@ class DeliveryRequest:
             raise InvalidTransition("REJECTED only if SUBMITTED")
         return replace(self, status=Status.REJECTED)
 
-    def __str__(self):
-        return self.status
+    # def __str__(self):
+    #     return self.status.value
