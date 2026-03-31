@@ -14,6 +14,7 @@ from policies.validations import (
 from .context import Context
 from .helpers import get_dr_or_raise, get_sr_or_raise
 from .errors import ValidationError
+from infra.errors import DataIntegrityError
 
 
 def create_delivery_request(
@@ -185,10 +186,19 @@ def void_sales_report(
         raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
 
     try:
+        missing_items = [
+            it for it in sr.items
+            if ctx.pi_repo.get(sr.partner_id, it.book_id) is None
+        ]
+        if missing_items:
+            missing_book_ids = [it.book_id for it in missing_items]
+            raise DataIntegrityError(
+                f"Cannot void sales report {sr_id}: missing inventory lines for "
+                f"partner '{sr.partner_id}', books: {missing_book_ids}"
+            )
+
         for it in sr.items:
             pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
-            if pi is None:
-                return sr_id, sr
             pi = pi.restore_sales(it.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
 
