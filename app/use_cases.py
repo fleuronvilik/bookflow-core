@@ -144,7 +144,9 @@ def submit_sales_report(
     if actor.role != Role.PARTNER:
         raise Forbidden("only PARTNER can submit a sales report")
 
-    report = SalesReport(partner_id=actor.partner_id, items=payload)  # invariants SR
+    report = SalesReport(
+        id=None, partner_id=actor.partner_id, items=payload
+    )  # invariants SR
     validate_report_items_in_catalog(report, ctx.catalog)  # policy externe
 
     working = {}
@@ -164,6 +166,7 @@ def submit_sales_report(
         for pi in working.values():
             ctx.pi_repo.save(pi, autocommit=False)
         ctx.sr_repo.conn.commit()
+        report = get_sr_or_raise(ctx, sr_id)
     except Exception:
         ctx.sr_repo.conn.rollback()
         raise
@@ -200,12 +203,12 @@ def void_sales_report(
             autocommit=False,
         )
         ctx.sr_repo.conn.commit()
+        report = get_sr_or_raise(ctx, sr_id)
     except Exception:
         ctx.sr_repo.conn.rollback()
         raise
 
-    # ctx.sr_repo.mark_void(sr_id)
-    return sr_id, get_sr_or_raise(ctx, sr_id)
+    return sr_id, report
 
 
 def get_sales_report(ctx: Context, actor: Actor, sr_id: int) -> SalesReport | None:

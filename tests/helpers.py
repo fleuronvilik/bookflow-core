@@ -8,7 +8,7 @@ from app.use_cases import (
     submit_sales_report,
 )
 from domain.delivery_request import DeliveryRequest, RequestItem, Status as DRStatus
-from domain.sales_report import SalesReport, ReportItem
+from domain.sales_report import ReportItem
 from policies.identity import Actor, Role
 
 
@@ -25,6 +25,12 @@ def default_items() -> List[RequestItem]:
     return [
         RequestItem(book_id="b1", quantity=2),
         RequestItem(book_id="b2", quantity=3),
+    ]
+
+
+def default_sales() -> List[ReportItem]:
+    return [
+        ReportItem(book_id="b2", quantity=2),
     ]
 
 

@@ -60,6 +60,7 @@ class SqlSalesReportRepo:
         items = [ReportItem(book_id=r[0], quantity=r[1]) for r in items_rows]
 
         return SalesReport(
+            id=row[0],
             partner_id=row[1],
             voided=bool(row[2]),
             items=items,

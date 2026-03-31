@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import List
 from .errors import InvalidReport
 
@@ -13,11 +13,14 @@ class ReportItem:
     quantity: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class SalesReport:
+    id: int | None
     partner_id: str
     items: List[ReportItem]
     voided: bool = False
+
+    MIN_TOTAL_QUANTITY = 2
 
     def __post_init__(self) -> None:
         if not self.partner_id:
@@ -26,7 +29,7 @@ class SalesReport:
         if not self.items:
             raise InvalidReport("report must contains at least one title")
 
-        total_quantity, min_size = 0, 2
+        total_quantity = 0
         books = set()
 
         for it in self.items:
@@ -42,12 +45,12 @@ class SalesReport:
                 raise InvalidReport("quantity must be positive")
             total_quantity += it.quantity
 
-        if total_quantity < min_size:
+        if total_quantity < self.MIN_TOTAL_QUANTITY:
             raise InvalidReport(
-                f"report minimum size is {min_size} (current size: {total_quantity})"
+                f"report minimum size is {self.MIN_TOTAL_QUANTITY} (current size: {total_quantity})"
             )
 
     def void(self):
         if self.voided:
             raise AlreadyVoided("report is already voided")
-        self.voided = True
+        return replace(self, voided=True)

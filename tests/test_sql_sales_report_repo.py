@@ -1,9 +1,10 @@
-import pytest
 from domain.sales_report import SalesReport, ReportItem
 
 
-def test_create_and_get_sr(ctx):
-    sr = SalesReport(partner_id="luigi", items=[ReportItem("b1", 3)])
+def test_create_and_get_sr(ctx, partner_actor):
+    sr = SalesReport(
+        id=None, partner_id=partner_actor.partner_id, items=[ReportItem("b1", 3)]
+    )
 
     sr_id = ctx.sr_repo.create(sr)
 
@@ -16,8 +17,10 @@ def test_create_and_get_sr(ctx):
 # def test_get_non_existent_sr(ctx):
 
 
-def test_mark_sr_as_voided(ctx):
-    sr = SalesReport(partner_id="luigi", items=[ReportItem("b1", 3)])
+def test_mark_sr_as_voided(ctx, partner_actor):
+    sr = SalesReport(
+        id=None, partner_id=partner_actor.partner_id, items=[ReportItem("b1", 3)]
+    )
 
     sr_id = ctx.sr_repo.create(sr)
 
