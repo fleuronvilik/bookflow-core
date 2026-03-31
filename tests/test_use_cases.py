@@ -18,6 +18,7 @@ from domain.delivery_request import (
     Status,
     RequestItem,
 )
+from infra.errors import DataIntegrityError
 from policies.identity import Forbidden, Role, Actor
 from policies.stock_projection import compute_partner_stock
 from tests.helpers import given_dr, given_sr
@@ -261,3 +262,51 @@ def test_void_sales_report_already_voided_raises(ctx, admin_actor, partner_actor
 def test_get_sales_report_not_found_raises_not_found(ctx, admin_actor):
     with pytest.raises(NotFound):
         get_sales_report(ctx, admin_actor, 999)
+
+
+def test_void_sales_report_with_missing_inventory_line(ctx, admin_actor, partner_actor):
+
+    _ = given_dr(
+        ctx,
+        partner_actor.partner_id,
+        Status.DELIVERED,
+        items=[
+            RequestItem(book_id="b1", quantity=4),
+            RequestItem(book_id="b2", quantity=4),
+            RequestItem(book_id="b3", quantity=4),
+        ],
+    )  # 4, 4, 4 livrés au partenaire
+    sr_id = given_sr(
+        ctx,
+        partner_actor.partner_id,
+        items=[
+            ReportItem(book_id="b3", quantity=1),
+            ReportItem(book_id="b2", quantity=2),
+        ],
+    )  # 4, 4, 4 -> 4, 2, 3 (restant en stock)
+
+    pi3 = ctx.pi_repo.get(partner_actor.partner_id, "b3")
+    pi2 = ctx.pi_repo.get(partner_actor.partner_id, "b2")
+    pi1 = ctx.pi_repo.get(partner_actor.partner_id, "b1")
+
+    assert pi3 and pi3.current_quantity == 3
+    assert pi2 and pi2.current_quantity == 2
+    assert pi1 and pi1.current_quantity == 4
+
+    # let us delete the inventory line for b3 to simulate the missing inventory line scenario during voiding
+
+    ctx.pi_repo.conn.execute(
+        "DELETE FROM partner_inventories WHERE partner_id = ? AND book_sku = ?",
+        (partner_actor.partner_id, "b3"),
+    )
+    ctx.pi_repo.conn.commit()
+
+    pi3 = ctx.pi_repo.get(partner_actor.partner_id, "b3")
+    assert pi3 is None
+
+    with pytest.raises(
+        DataIntegrityError,
+        match="contains following items \\(b3\\), for which no inventory line exists",
+        # match="sales report with id .* contains book_id\\(s\\) b3 for which no inventory line exists",
+    ):
+        void_sales_report(ctx, admin_actor, sr_id, "invalid report")
