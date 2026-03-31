@@ -28,7 +28,7 @@ class PartnerInventory:
             version=self.version + 1,
         )
 
-    def restore_sales(self, quantity: int):
+    def restore_sale(self, quantity: int):
         return replace(
             self,
             current_quantity=self.current_quantity + quantity,

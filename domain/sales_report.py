@@ -26,7 +26,7 @@ class SalesReport:
             raise InvalidReport("partner_id is missing")
 
         if not self.items:
-            raise InvalidReport("report must contains at least one title")
+            raise InvalidReport("report must contain at least one title")
 
         total_quantity = 0
         books = set()

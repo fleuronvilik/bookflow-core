@@ -80,7 +80,7 @@ def reject_delivery_request(
     ctx: Context, actor: Actor, dr_id: int, reason: str
 ) -> tuple[int, DeliveryRequest]:
     if actor.role != Role.ADMIN:
-        raise Forbidden("only an ADMIN can reject a deliery request")
+        raise Forbidden("only an ADMIN can reject a delivery request")
 
     # reason obligatoire
     if reason is None or not str(reason).strip():
