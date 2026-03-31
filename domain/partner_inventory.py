@@ -1,30 +1,39 @@
+from dataclasses import dataclass, replace
+
 from domain.errors import InsufficientStock
 
 
+@dataclass(frozen=True)
 class PartnerInventory:
-    def __init__(
-        self, partner_id: str, book_sku: str, current_quantity: int, version: int = 0
-    ):
-        self.partner_id = partner_id
-        self.book_sku = book_sku
-        self.current_quantity = current_quantity
-        self.version = version
+    partner_id: str
+    book_sku: str
+    current_quantity: int
+    version: int = 0
 
     def deliver(self, quantity: int):
-        self.current_quantity += quantity
-        self.version += 1
+        return replace(
+            self,
+            current_quantity=self.current_quantity + quantity,
+            version=self.version + 1,
+        )
 
     def reportSale(self, quantity: int):
         if self.current_quantity < quantity:
             raise InsufficientStock(
                 f"Cannot report sale of {quantity} for {self.book_sku}, only {self.current_quantity} available"
             )
-        self.current_quantity -= quantity
-        self.version += 1
+        return replace(
+            self,
+            current_quantity=self.current_quantity - quantity,
+            version=self.version + 1,
+        )
 
     def restoreSales(self, quantity: int):
-        self.current_quantity += quantity
-        self.version += 1
+        return replace(
+            self,
+            current_quantity=self.current_quantity + quantity,
+            version=self.version + 1,
+        )
 
     def clone(self):
         return PartnerInventory(

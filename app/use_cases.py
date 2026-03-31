@@ -125,7 +125,7 @@ def mark_delivered(
                 pi = PartnerInventory(
                     partner_id=dr.partner_id, book_sku=items.book_id, current_quantity=0
                 )
-            pi.deliver(items.quantity)
+            pi = pi.deliver(items.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
         ctx.dr_repo.save_status(dr, autocommit=False)
         ctx.dr_repo.conn.commit()
@@ -156,7 +156,7 @@ def submit_sales_report(
                 raise InsufficientStock(
                     f"Cannot report sale of {it.quantity} for {it.book_id}, no copy available"
                 )
-            pi.reportSale(it.quantity)
+            pi = pi.reportSale(it.quantity)
             working[key] = pi  # .clone()
 
     try:
@@ -187,7 +187,7 @@ def void_sales_report(
     try:
         for it in sr.items:
             pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
-            pi.restoreSales(it.quantity)
+            pi = pi.restoreSales(it.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
 
         ctx.sr_repo.mark_void(sr_id, autocommit=False)
