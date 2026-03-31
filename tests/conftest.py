@@ -37,8 +37,8 @@ class TestSqlDeliveryRequestRepo(SqlDeliveryRequestRepo):
         ]
         return [(dr_id, self.get(dr_id)) for dr_id in ids]
 
-    def save_status(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
-        return super().save_status(dr, autocommit)
+    def save(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
+        return super().save(dr, autocommit)
 
 
 class TestSqlSalesReportRepo(SqlSalesReportRepo):

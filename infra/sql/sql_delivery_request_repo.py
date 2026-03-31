@@ -67,7 +67,7 @@ class SqlDeliveryRequestRepo:
             items=items,
         )
 
-    def save_status(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
+    def save(self, dr: DeliveryRequest, autocommit: bool = True) -> int:
         cur = self.conn.cursor()
         cur.execute(
             """

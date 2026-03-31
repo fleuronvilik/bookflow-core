@@ -58,7 +58,7 @@ def submit_delivery_request(
     )
 
     dr = dr.submit()
-    ctx.dr_repo.save_status(dr)
+    ctx.dr_repo.save(dr)
     return dr_id, dr
 
 
@@ -71,7 +71,7 @@ def approve_delivery_request(
 
     dr = get_dr_or_raise(ctx, dr_id)
     dr = dr.approve()
-    ctx.dr_repo.save_status(dr)
+    ctx.dr_repo.save(dr)
     return dr_id, dr
 
 
@@ -101,7 +101,7 @@ def reject_delivery_request(
 
         # Transition métier (idéalement: l'entité refuse si state != SUBMITTED)
         dr = dr.reject()
-        ctx.dr_repo.save_status(dr, autocommit=False)
+        ctx.dr_repo.save(dr, autocommit=False)
         ctx.dr_repo.conn.commit()
     except Exception:
         ctx.dr_repo.conn.rollback()
@@ -127,7 +127,7 @@ def mark_delivered(
                 )
             pi = pi.deliver(items.quantity)
             ctx.pi_repo.save(pi, autocommit=False)
-        ctx.dr_repo.save_status(dr, autocommit=False)
+        ctx.dr_repo.save(dr, autocommit=False)
         ctx.dr_repo.conn.commit()
     except Exception:
         ctx.dr_repo.conn.rollback()
