@@ -23,6 +23,8 @@ Bookflow models the following systems:
 | `Audit` | Cross-cutting | Records system events |
 | `ProjectionStock` | Projection | Computes stock from deliveries and sales |
 
+For a detailed breakdown of each bounded context — including invariants, business rules, key objects, and inter-context dependencies — see **[CONTEXTS.md](CONTEXTS.md)**.
+
 ---
 
 ## Use Cases
