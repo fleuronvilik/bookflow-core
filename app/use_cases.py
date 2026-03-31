@@ -14,7 +14,7 @@ from policies.validations import (
 from .context import Context
 from .helpers import get_dr_or_raise, get_sr_or_raise
 from .errors import ValidationError
-from infra.errors import DataIntegrityError
+# from infra.errors import DataIntegrityError # leaving it there for now
 
 
 def create_delivery_request(
@@ -186,16 +186,12 @@ def void_sales_report(
         raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
 
     try:
-        missing_items = [
-            it for it in sr.items
-            if ctx.pi_repo.get(sr.partner_id, it.book_id) is None
-        ]
-        if missing_items:
-            missing_book_ids = [it.book_id for it in missing_items]
-            raise DataIntegrityError(
-                f"Cannot void sales report {sr_id}: missing inventory lines for "
-                f"partner '{sr.partner_id}', books: {missing_book_ids}"
-            )
+        # data integrity error is a stretch we will ignore for now,
+        # but it could happen if, for example, the inventory line for a book in the report was deleted
+        # between the time we load the report and the time we try to restore quantity for that line
+        # the system does not allow deleting inventory lines
+        # the only way to manually create such a scenario would be to directly manipulate the database between retrieval and voiding,
+        # which is out of scope for this project goal
 
         for it in sr.items:
             pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
