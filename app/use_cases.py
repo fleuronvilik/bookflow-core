@@ -12,7 +12,7 @@ from policies.validations import (
     validate_request_items_in_catalog,
 )
 from .context import Context
-from .helpers import get_dr_or_raise, get_sr_or_raise
+from .helpers import get_dr_or_raise, get_sr_or_raise, restore_quantities_or_raise
 from .errors import ValidationError
 # from infra.errors import DataIntegrityError # leaving it there for now
 
@@ -186,18 +186,7 @@ def void_sales_report(
         raise AlreadyVoided(f"sales report with id {sr_id} is already voided")
 
     try:
-        # data integrity error is a stretch we will ignore for now,
-        # but it could happen if, for example, the inventory line for a book in the report was deleted
-        # between the time we load the report and the time we try to restore quantity for that line
-        # the system does not allow deleting inventory lines
-        # the only way to manually create such a scenario would be to directly manipulate the database between retrieval and voiding,
-        # which is out of scope for this project goal
-
-        for it in sr.items:
-            pi = ctx.pi_repo.get(sr.partner_id, it.book_id)
-            pi = pi.restore_sales(it.quantity)
-            ctx.pi_repo.save(pi, autocommit=False)
-
+        restore_quantities_or_raise(ctx, sr, autocommit=False)
         ctx.sr_repo.mark_void(sr_id, autocommit=False)
         ctx.audit.record(
             {
