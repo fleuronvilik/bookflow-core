@@ -1,5 +1,3 @@
-from typing import List
-
 from app.use_cases import (
     approve_delivery_request,
     mark_delivered,
@@ -20,7 +18,7 @@ def admin_actor():
     return Actor(role=Role.ADMIN, partner_id=None)
 
 
-def default_items() -> List[RequestItem]:
+def default_items() -> list[RequestItem]:
     # respecte MinimumCopies = 2
     return [
         RequestItem(book_id="b1", quantity=2),
@@ -28,7 +26,7 @@ def default_items() -> List[RequestItem]:
     ]
 
 
-def default_sales() -> List[ReportItem]:
+def default_sales() -> list[ReportItem]:
     return [
         ReportItem(book_id="b2", quantity=2),
     ]
@@ -65,9 +63,9 @@ def given_dr(ctx, partner_id: str, status: DRStatus, items=None) -> int:
     return dr_id
 
 
-def given_sr(
-    ctx, partner_id: str, items=[ReportItem(book_id="b2", quantity=2)], voided=False
-) -> int:
+def given_sr(ctx, partner_id: str, items: list[ReportItem] = [], voided=False) -> int:
+    if not items:
+        items = default_sales()
     sr_id, _ = submit_sales_report(ctx, partner_actor(partner_id), items)
     if voided:
         ctx.sr_repo.void(sr_id)

@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 from domain.errors import InsufficientStock
 from domain.partner_inventory import PartnerInventory
 from domain.delivery_request import RequestItem, DeliveryRequest
@@ -19,8 +17,8 @@ from .errors import ValidationError
 
 
 def create_delivery_request(
-    ctx: Context, actor: Actor, payload: List[RequestItem]
-) -> Tuple[int, DeliveryRequest]:
+    ctx: Context, actor: Actor, payload: list[RequestItem]
+) -> tuple[int, DeliveryRequest]:
     if actor.role is not Role.PARTNER:
         raise Forbidden("only PARTNER can create a delivery request")
 
@@ -40,7 +38,7 @@ def create_delivery_request(
 
 def submit_delivery_request(
     ctx: Context, actor: Actor, dr_id: int
-) -> Tuple[int, DeliveryRequest]:
+) -> tuple[int, DeliveryRequest]:
     # AuthZ minimale (comme pour submit SR)
     if actor.role is not Role.PARTNER:
         raise Forbidden("only PARTNER can submit a delivery request")
@@ -66,7 +64,7 @@ def submit_delivery_request(
 
 def approve_delivery_request(
     ctx: Context, actor: Actor, dr_id: int
-) -> Tuple[int, DeliveryRequest]:
+) -> tuple[int, DeliveryRequest]:
     # AuthZ minimale (comme pour submit SR)
     if actor.role is not Role.ADMIN:
         raise Forbidden("only ADMIN can approve a delivery request")
@@ -79,7 +77,7 @@ def approve_delivery_request(
 
 def reject_delivery_request(
     ctx: Context, actor: Actor, dr_id: int, reason: str
-) -> Tuple[int, DeliveryRequest]:
+) -> tuple[int, DeliveryRequest]:
     if actor.role != Role.ADMIN:
         raise Forbidden("only an ADMIN can reject a deliery request")
 
@@ -114,7 +112,7 @@ def reject_delivery_request(
 
 def mark_delivered(
     ctx: Context, actor: Actor, dr_id: int
-) -> Tuple[int, DeliveryRequest]:
+) -> tuple[int, DeliveryRequest]:
     if actor.role is not Role.ADMIN:
         raise Forbidden("only ADMIN can mark a delivery request delivered")
 
@@ -138,8 +136,8 @@ def mark_delivered(
 
 
 def submit_sales_report(
-    ctx: Context, actor: Actor, payload: List[ReportItem]
-) -> Tuple[int, SalesReport]:
+    ctx: Context, actor: Actor, payload: list[ReportItem]
+) -> tuple[int, SalesReport]:
     # AuthZ minimale (rôles) : hors SR
     if actor.role != Role.PARTNER:
         raise Forbidden("only PARTNER can submit a sales report")
@@ -175,7 +173,7 @@ def submit_sales_report(
 
 def void_sales_report(
     ctx: Context, actor: Actor, sr_id: int, reason: str
-) -> Tuple[int, SalesReport]:
+) -> tuple[int, SalesReport]:
     if actor.role != Role.ADMIN:
         raise Forbidden("only an ADMIN can void a sales report")
 

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, replace
-from typing import List
 from .errors import InvalidReport
 
 
@@ -17,7 +16,7 @@ class ReportItem:
 class SalesReport:
     id: int | None
     partner_id: str
-    items: List[ReportItem]
+    items: list[ReportItem]
     voided: bool = False
 
     MIN_TOTAL_QUANTITY = 2

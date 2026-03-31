@@ -1,5 +1,3 @@
-from typing import Dict
-
 from infra.sql.sql_delivery_request_repo import SqlDeliveryRequestRepo
 from infra.sql.sql_sales_report_repo import SqlSalesReportRepo
 
@@ -8,7 +6,7 @@ def compute_partner_stock(
     partner_id: str,
     dr_repo: SqlDeliveryRequestRepo,
     sr_repo: SqlSalesReportRepo,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     cur = dr_repo.conn.cursor()
 
     delivered_rows = cur.execute(

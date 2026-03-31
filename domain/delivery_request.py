@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import List
 
 
 class InvalidDeliveryRequest(Exception):
@@ -33,13 +32,13 @@ class DeliveryRequest:
     id: int | None
     partner_id: str
     status: Status
-    items: List[RequestItem]
+    items: list[RequestItem]
 
     MIN_TOTAL_QUANTITY = 2
 
     @classmethod
     def save_draft(
-        cls, *, partner_id: str, items: List[RequestItem]
+        cls, *, partner_id: str, items: list[RequestItem]
     ) -> "DeliveryRequest":
         # DR non vide dès la création (selon ton choix)
         if not partner_id:
