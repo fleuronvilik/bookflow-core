@@ -14,8 +14,15 @@ def test_create_and_get_dr(ctx, partner_actor):
     assert loaded.items == [RequestItem("b1", 3)]
 
 
-def test_save(ctx, partner_actor):
+def test_save_dr(ctx, partner_actor):
     dr_id = given_dr(ctx, partner_actor.partner_id, DRStatus.DRAFT)
 
     loaded = ctx.dr_repo.get(dr_id)
     assert loaded.status == DRStatus.DRAFT
+
+    # mutate status and save
+    loaded = loaded.submit()
+    ctx.dr_repo.save(loaded)
+
+    reloaded = ctx.dr_repo.get(dr_id)
+    assert reloaded.status == DRStatus.SUBMITTED
