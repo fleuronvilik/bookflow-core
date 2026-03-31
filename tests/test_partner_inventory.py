@@ -45,18 +45,15 @@ def test_void_sales_report_restores_inventory(ctx, partner_actor, admin_actor):
     pi = PartnerInventory(partner_id="p1", book_sku="b1", current_quantity=10)
     ctx.pi_repo.save(pi)
 
-    report_id, report = submit_sales_report(
+    report_id, _ = submit_sales_report(
         ctx, partner_actor, [ReportItem(book_id="b1", quantity=4)]
     )
 
     assert (
         ctx.pi_repo.get("p1", "b1").current_quantity == 6
-    )  # inventory should be decreased
-
-    # Simulate reporting the sale (without actually updating inventory in this test)
-    # and then voiding the sales report
+    )  # inventory should be decreased after submitting the sales report
     void_sales_report(ctx, admin_actor, report_id, reason="test void")
 
-    # After voiding, the inventory should be restored
+    # Void the previously submitted sales report, which should restore inventory
     updated_pi = ctx.pi_repo.get("p1", "b1")
-    assert updated_pi.current_quantity == 10  # inventory should be restored
+    assert updated_pi.current_quantity == 10

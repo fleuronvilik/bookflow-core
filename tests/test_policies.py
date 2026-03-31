@@ -2,7 +2,6 @@ import pytest
 
 from domain.delivery_request import RequestItem, Status as DRStatus
 from app.use_cases import submit_delivery_request, void_sales_report
-from domain.sales_report import ReportItem
 from policies.active_delivery_request import ActiveDeliveryRequestExists
 from policies.identity import Actor, Role
 from policies.report_required import ReportRequired

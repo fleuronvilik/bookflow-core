@@ -55,10 +55,10 @@ def test_submit_sales_report_requires_known_book_ids(ctx, partner_actor):
 
 
 def test_submit_sales_report_rejects_quantities_gt_stock(ctx, partner_actor):
-    # Stock entrant: 1 de b1 et 3 de b2livré au partenaire
+    # Stock entrant: 2 examplaires de b1 et 3 de b2 livrés au partenaire
     _ = given_dr(ctx, partner_actor.partner_id, Status.DELIVERED)
 
-    # Ventes déclarées: 3 exemplaires => dépasse le stock entrant (2)
+    # Ventes déclarées: 3 exemplaires de b1 => dépasse le stock entrant (2)
     with pytest.raises(InsufficientStock):
         submit_sales_report(
             ctx=ctx,
@@ -105,64 +105,6 @@ def test_partner_cannot_submit_another_partner_delivery_request(ctx):
 
     with pytest.raises(Forbidden):
         submit_delivery_request(ctx, p2, dr_id)
-
-
-# def test_list_reports_by_partner_filters_for_admin(admin_actor, sr_repo):
-#     r1 = SalesReport(partner_id="p1", items=[ReportItem(book_id="b1", quantity=3)])
-#     r2 = SalesReport(partner_id="p1", items=[ReportItem(book_id="b2", quantity=2)])
-#     r3 = SalesReport(partner_id="p2", items=[ReportItem(book_id="b1", quantity=4)])
-
-#     sr_repo.add(r1)
-#     sr_repo.add(r2)
-#     sr_repo.add(r3)
-
-#     result = list_reports_by_partner(
-#         actor=admin_actor, partner_id="p1", sr_repo=sr_repo
-#     )
-
-#     assert result == [r1, r2]
-
-
-# def test_list_reports_by_partner_returns_empty_list_if_none(admin_actor, sr_repo):
-#     result = list_reports_by_partner(
-#         actor=admin_actor, partner_id="p1", sr_repo=sr_repo
-#     )
-#     assert result == []
-
-
-# def test_list_reports_by_partner_rejects_partner(partner_actor, sr_repo):
-#     with pytest.raises(Forbidden):
-#         list_reports_by_partner(
-#             actor=partner_actor, partner_id=partner_actor.partner_id, sr_repo=sr_repo
-#         )
-
-
-# def test_list_my_reports_rejects_admin(admin_actor, sr_repo):
-#     with pytest.raises(Forbidden):
-#         list_my_reports(actor=admin_actor, sr_repo=sr_repo)
-
-
-# def test_list_my_reports_happy_path(partner_actor, sr_repo):
-#     r1 = SalesReport(
-#         partner_id=partner_actor.partner_id,
-#         items=[ReportItem(book_id="b1", quantity=3)],
-#     )
-#     r2 = SalesReport(
-#         partner_id=partner_actor.partner_id,
-#         items=[ReportItem(book_id="b2", quantity=2)],
-#     )
-#     r3 = SalesReport(partner_id="p2", items=[ReportItem(book_id="b1", quantity=4)])
-
-#     sr_repo.add(r1)
-#     sr_repo.add(r2)
-#     sr_repo.add(r3)
-
-#     a3 = Actor(role=Role.PARTNER, partner_id="p3")
-
-#     result = list_my_reports(actor=partner_actor, sr_repo=sr_repo)
-#     assert result == [r1, r2]
-#     result = list_my_reports(actor=a3, sr_repo=sr_repo)
-#     assert result == []
 
 
 def test_create_delivery_request_requires_known_book_ids(ctx, partner_actor):
