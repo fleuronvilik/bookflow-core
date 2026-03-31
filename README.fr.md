@@ -13,6 +13,8 @@ Modélisation d'un système de dépôt-vente pour la distribution de livres.
 | `Audit` | Transversal | Trace les événements système |
 | `ProjectionStock` | Projection | État du stock à partir des livraisons et ventes |
 
+Pour une description détaillée de chaque bounded context — invariants, règles métier, objets clés et dépendances — voir **[CONTEXTS.md](CONTEXTS.md)**.
+
 ## Use cases
 
 `CreateDR` · `SubmitDR` · `ApproveDR` · `RejectDR` · `DeliverDR` · `SubmitSR` · `VoidSR` · `GetDR` · `GetSR`
