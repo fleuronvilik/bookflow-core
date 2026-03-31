@@ -52,4 +52,4 @@ CREATE TABLE partner_inventories (
     CHECK (current_quantity >= 0),
     CHECK (version >= 0),
     CHECK (partner_id IN ('p1', 'p2', 'luigi', 'mario', 'peach', 'yoshi'))
-)
+);

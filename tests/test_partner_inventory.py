@@ -1,7 +1,8 @@
 import pytest
 
 from app.use_cases import submit_sales_report, void_sales_report
-from domain.partner_inventory import InsufficientStock, PartnerInventory
+from domain.partner_inventory import PartnerInventory
+from domain.errors import InsufficientStock
 from domain.sales_report import ReportItem
 
 
@@ -9,7 +10,7 @@ def test_report_decreases_inventory_and_raises_if_insufficient(ctx):
     pi = PartnerInventory(partner_id="p1", book_sku="b1", current_quantity=10)
     ctx.pi_repo.save(pi)
 
-    pi = pi.reportSale(4)
+    pi = pi.report_sale(4)
     ctx.pi_repo.save(pi)
 
     updated_pi = ctx.pi_repo.get("p1", "b1")
@@ -17,7 +18,7 @@ def test_report_decreases_inventory_and_raises_if_insufficient(ctx):
 
     # reporting more than available should raise
     with pytest.raises(InsufficientStock):
-        pi.reportSale(7)
+        pi = pi.report_sale(7)
 
 
 def test_multiple_lines_atomicity(ctx, partner_actor):

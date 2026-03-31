@@ -17,7 +17,7 @@ class PartnerInventory:
             version=self.version + 1,
         )
 
-    def reportSale(self, quantity: int):
+    def report_sale(self, quantity: int):
         if self.current_quantity < quantity:
             raise InsufficientStock(
                 f"Cannot report sale of {quantity} for {self.book_sku}, only {self.current_quantity} available"
@@ -28,7 +28,7 @@ class PartnerInventory:
             version=self.version + 1,
         )
 
-    def restoreSales(self, quantity: int):
+    def restore_sales(self, quantity: int):
         return replace(
             self,
             current_quantity=self.current_quantity + quantity,

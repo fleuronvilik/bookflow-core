@@ -12,7 +12,7 @@ class SqlPartnerInventoryRepo:
         cur.execute(
             """
             INSERT INTO partner_inventories (partner_id, book_sku, current_quantity, version)
-            VALUES (?, ?, ?, ?) ON CONFLICT (partner_id, book_sku) DO UPDATE
+            VALUES (?, ?, ?, ?) ON CONFLICT (book_sku, partner_id) DO UPDATE
             SET current_quantity = excluded.current_quantity, version = excluded.version
         """,
             (
